@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Copy, Check, User as UserIcon, X, Swords } from 'lucide-react';
 import type { User } from '../types';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+// import { data } from 'react-router-dom';
 
 interface MatchmakingModalProps {
   isOpen: boolean;
@@ -21,13 +22,16 @@ export const MatchmakingModal: React.FC<MatchmakingModalProps> = ({
   const [copied, setCopied] = useState(false);
   const [roomCode, setRoomCode] = useState('582 914');
   const [opponentFound, setOpponentFound] = useState(false);
+  // const [roomId, setRoomId] = useState<string | null>(null);
   const [guestDetails, setGuestDetails] = useState<{ name: string; avatar?: string } | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
 
-    // Generate dynamic 6-digit room code
-    const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const randomCode = Math.floor(
+      100000 + Math.random() * 900000
+    ).toString();
+
     const formattedCode = `${randomCode.slice(0, 3)} ${randomCode.slice(3)}`;
     const cleanCode = randomCode;
 
@@ -35,104 +39,119 @@ export const MatchmakingModal: React.FC<MatchmakingModalProps> = ({
     setCopied(false);
     setOpponentFound(false);
     setGuestDetails(null);
+    // setRoomId(null);
 
-    // 1. Create Room in Supabase
-    const createGameRoomInSupabase = async () => {
-      console.log(isSupabaseConfigured)
-      if (!isSupabaseConfigured()) return;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    const setupRoom = async () => {
+      if (!isSupabaseConfigured() || !user?.id) {
+        console.log('Supabase yoki user mavjud emas');
+        return;
+      }
+
       try {
-        // const roomPayload = {
-        //   room_code: cleanCode,
-        //   code: cleanCode,
-        //   subject: subject,
-        //   host_id: user?.id,
-        //   created_by: user?.id,
-        //   host_name: user?.name || 'Xona Egasi',
-        //   host_avatar: user?.avatar,
-        //   status: 'waiting',
-        //   created_at: new Date().toISOString()
-        // };
+        // ============================================
+        // 1. ROOM YARATISH
+        // ============================================
 
-        const { error } = await supabase
+        const { data: room, error: createError } = await supabase
           .from('game_rooms')
           .insert({
             room_code: cleanCode,
             code: cleanCode,
-            subject: subject,
-            host_id: user?.id,
-            created_by: user?.id,
-            host_name: user?.name || 'Xona Egasi',
-            host_avatar: user?.avatar,
+            subject,
+            host_id: user.id,
+            host_name: user.name || 'Xona Egasi',
+            host_avatar: user.avatar || null,
             status: 'waiting',
-            created_at: new Date().toISOString()
-          });
+            created_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
 
-        if (error) {
-          console.log('game_rooms insert fallback notice:', error.message);
-          await supabase.from('game_room').insert({
-            room_code: cleanCode,
-            code: cleanCode,
-            subject: subject,
-            host_id: user?.id,
-            created_by: user?.id,
-            host_name: user?.name || 'Xona Egasi',
-            host_avatar: user?.avatar,
-            status: 'waiting',
-            created_at: new Date().toISOString()
-          });
+        if (createError) {
+          console.error(
+            '❌ Room yaratishda xatolik:',
+            createError
+          );
+          return;
         }
+
+        console.log('✅ Room yaratildi:', room);
+
+        // setRoomId(room.id);
+
+        // ============================================
+        // 2. REALTIME LISTENER
+        // ============================================
+
+        channel = supabase
+          .channel(`room_${room.id}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'game_rooms',
+              filter: `id=eq.${room.id}`,
+            },
+            (payload) => {
+              console.log(
+                '🔔 GAME ROOM UPDATE:',
+                payload
+              );
+
+              const updatedRoom = payload.new as any;
+
+              // Raqib qo'shilganini tekshiramiz
+              if (
+                updatedRoom.status === 'matched' &&
+                updatedRoom.guest_id
+              ) {
+                console.log(
+                  '🎮 Raqib topildi:',
+                  updatedRoom.guest_name
+                );
+
+                setGuestDetails({
+                  name:
+                    updatedRoom.guest_name ||
+                    'Raqib',
+                  avatar:
+                    updatedRoom.guest_avatar ||
+                    undefined,
+                });
+
+                setOpponentFound(true);
+              }
+            }
+          )
+          .subscribe((status) => {
+            console.log(
+              '📡 Realtime status:',
+              status
+            );
+          });
       } catch (err) {
-        console.error('Supabase room yaratishda xatolik:', err);
+        console.error(
+          '❌ Room setup xatosi:',
+          err
+        );
       }
     };
 
-    createGameRoomInSupabase();
+    setupRoom();
 
-    // 2. Realtime Subscription to listen for Guest joining this room code
-    let channel: any = null;
-    if (isSupabaseConfigured()) {
-      channel = supabase
-        .channel(`room_${cleanCode}`)
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'game_rooms',
-            filter: `room_code=eq.${cleanCode}`
-          },
-          (payload) => {
-            const updatedRoom = payload.new;
-            if (updatedRoom?.guest_name || updatedRoom?.status === 'matched') {
-              setGuestDetails({
-                name: updatedRoom.guest_name || 'Raqib',
-                avatar: updatedRoom.guest_avatar
-              });
-              setOpponentFound(true);
-            }
-          }
-        )
-        .subscribe();
-    }
-
-    // 3. Fallback demo simulation if no real opponent joins in 8 seconds
-    const timer = setTimeout(() => {
-      setOpponentFound((prev) => {
-        if (!prev) {
-          setGuestDetails({
-            name: '@Aziz_Coder',
-            avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'
-          });
-          return true;
-        }
-        return prev;
-      });
-    }, 8000);
+    // ============================================
+    // CLEANUP
+    // ============================================
 
     return () => {
-      clearTimeout(timer);
       if (channel) {
         supabase.removeChannel(channel);
+        console.log(
+          '📡 Realtime channel yopildi'
+        );
       }
     };
   }, [isOpen, subject, user?.id, user?.name, user?.avatar]);

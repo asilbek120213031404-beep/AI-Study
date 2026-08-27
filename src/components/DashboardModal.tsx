@@ -176,36 +176,59 @@ export const DashboardModal: React.FC<DashboardModalProps> = ({
     }
   };
 
-  const handleGuestJoinRoom = async (codeToJoin?: string, defaultSubject: string = 'Dasturlash') => {
-    const targetCode = (codeToJoin || inputBattleCode).trim().replace(/\s+/g, '');
-    if (isSupabaseConfigured() && targetCode) {
-      try {
-        const { data: room } = await supabase
-          .from('game_rooms')
-          .select('*')
-          .or(`room_code.eq.${targetCode},code.eq.${targetCode}`)
-          .maybeSingle();
+  const handleGuestJoinRoom = async (
+    codeToJoin?: string,
+    defaultSubject: string = 'Dasturlash'
+  ) => {
+    const targetCode = (codeToJoin || inputBattleCode)
+      .trim()
+      .replace(/\s+/g, '');
 
-        if (room) {
-          await supabase
-            .from('game_rooms')
-            .update({
-              guest_id: user?.id,
-              guest_name: user?.name || 'Raqib',
-              guest_avatar: user?.avatar,
-              status: 'matched'
-            })
-            .eq('id', room.id);
-
-          onStartBattle(room.subject || defaultSubject);
-          return;
-        }
-      } catch (err) {
-        console.error('Supabase xonasiga ulanishda xatolik:', err);
-      }
+    if (!isSupabaseConfigured() || !targetCode || !user?.id) {
+      onStartBattle(defaultSubject);
+      return;
     }
 
-    onStartBattle(defaultSubject);
+    try {
+      const { data: room, error: findError } = await supabase
+        .from('game_rooms')
+        .select('*')
+        .or(`room_code.eq.${targetCode},code.eq.${targetCode}`)
+        .eq('status', 'waiting')
+        .maybeSingle();
+
+      if (findError) {
+        console.error('Room qidirishda xatolik:', findError);
+        return;
+      }
+
+      if (!room) {
+        console.log('Room topilmadi');
+        return;
+      }
+
+      const { error: updateError } = await supabase
+        .from('game_rooms')
+        .update({
+          guest_id: user.id,
+          guest_name: user.name || 'Raqib',
+          guest_avatar: user.avatar || null,
+          status: 'matched'
+        })
+        .eq('id', room.id);
+
+      if (updateError) {
+        console.error('Roomga qo‘shilishda xatolik:', updateError);
+        return;
+      }
+
+      console.log('Roomga muvaffaqiyatli qo‘shildingiz');
+
+      onStartBattle(room.subject);
+
+    } catch (err) {
+      console.error('Supabase xonasiga ulanishda xatolik:', err);
+    }
   };
 
   return (
