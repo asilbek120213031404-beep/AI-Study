@@ -38,27 +38,48 @@ export const MatchmakingModal: React.FC<MatchmakingModalProps> = ({
 
     // 1. Create Room in Supabase
     const createGameRoomInSupabase = async () => {
+      console.log(isSupabaseConfigured)
       if (!isSupabaseConfigured()) return;
       try {
-        const roomPayload = {
-          room_code: cleanCode,
-          code: cleanCode,
-          subject: subject,
-          host_id: user?.id,
-          created_by: user?.id,
-          host_name: user?.name || 'Xona Egasi',
-          host_avatar: user?.avatar,
-          status: 'waiting',
-          created_at: new Date().toISOString()
-        };
+        // const roomPayload = {
+        //   room_code: cleanCode,
+        //   code: cleanCode,
+        //   subject: subject,
+        //   host_id: user?.id,
+        //   created_by: user?.id,
+        //   host_name: user?.name || 'Xona Egasi',
+        //   host_avatar: user?.avatar,
+        //   status: 'waiting',
+        //   created_at: new Date().toISOString()
+        // };
 
         const { error } = await supabase
           .from('game_rooms')
-          .insert([roomPayload]);
+          .insert({
+            room_code: cleanCode,
+            code: cleanCode,
+            subject: subject,
+            host_id: user?.id,
+            created_by: user?.id,
+            host_name: user?.name || 'Xona Egasi',
+            host_avatar: user?.avatar,
+            status: 'waiting',
+            created_at: new Date().toISOString()
+          });
 
         if (error) {
           console.log('game_rooms insert fallback notice:', error.message);
-          await supabase.from('game_room').insert([roomPayload]);
+          await supabase.from('game_room').insert({
+            room_code: cleanCode,
+            code: cleanCode,
+            subject: subject,
+            host_id: user?.id,
+            created_by: user?.id,
+            host_name: user?.name || 'Xona Egasi',
+            host_avatar: user?.avatar,
+            status: 'waiting',
+            created_at: new Date().toISOString()
+          });
         }
       } catch (err) {
         console.error('Supabase room yaratishda xatolik:', err);
@@ -134,7 +155,7 @@ export const MatchmakingModal: React.FC<MatchmakingModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fadeIn">
       <div className="bg-[#0A0D1B] border border-slate-800/90 rounded-3xl w-full max-w-sm md:max-w-md p-6 md:p-8 space-y-6 shadow-2xl relative text-center text-slate-100">
-        
+
         {/* Close Button */}
         <button
           onClick={onClose}
@@ -146,7 +167,7 @@ export const MatchmakingModal: React.FC<MatchmakingModalProps> = ({
 
         {/* Players Matchmaking Header Layout */}
         <div className="flex items-center justify-center gap-4 md:gap-6 pt-2">
-          
+
           {/* Host Player (Left) */}
           <div className="flex flex-col items-center space-y-1">
             <div className="relative">
@@ -201,7 +222,7 @@ export const MatchmakingModal: React.FC<MatchmakingModalProps> = ({
                 <UserIcon className="w-8 h-8 text-slate-600" />
               </div>
             )}
-            
+
             <div className="pt-2">
               <div className="font-extrabold text-base text-slate-300 truncate max-w-[90px]">
                 {opponentFound ? guestName : 'Raqib...'}

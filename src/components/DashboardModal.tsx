@@ -109,7 +109,7 @@ export const DashboardModal: React.FC<DashboardModalProps> = ({
   const rank = dbProfile?.rank ?? user?.rank ?? 127;
   const wins = dbProfile?.battles_won ?? user?.battles_won ?? 45;
   const losses = dbProfile?.battles_lost ?? user?.battles_lost ?? 20;
-  const winRate = losses > 0 ? Math.round((wins / losses) * 100) : (wins > 0 ? 100 : 0);
+  const winRate = losses > 0 ? Math.round(100 - (wins / losses) * 10) : (wins > 0 ? 100 : 0);
   const avatarUrl = dbProfile?.avatar_url || user?.avatar || 'https://images.unsplash.com/photo-1566492031773-4f4e44671857?w=120&auto=format&fit=crop&q=80';
 
   const navItems = [
