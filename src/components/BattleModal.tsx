@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   Swords,
   RotateCcw,
-  ArrowRight,
   ArrowLeft,
   CheckCircle2,
   Clock,
   User as UserIcon,
+  Loader2,
 } from 'lucide-react';
 import { SAMPLE_QUESTIONS } from '../data/questionsData';
 import confetti from 'canvas-confetti';
@@ -38,11 +38,13 @@ export const BattleModal: React.FC<BattleModalProps> = ({
   // Opponent Realtime state
   const [opponentSubmitted, setOpponentSubmitted] = useState(false);
   const [opponentOpt, setOpponentOpt] = useState<number | null>(null);
-  // const [opponentIsCorrect, setOpponentIsCorrect] = useState<boolean | null>(null);
 
   const [battleOver, setBattleOver] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
 
-  // Filter questions based on selected subject if matched, otherwise fallback to all questions
+  const transitionRef = useRef(false);
+
+  // Filter questions based on selected subject if matched
   const filteredQuestions = React.useMemo(() => {
     if (!selectedSubject) return SAMPLE_QUESTIONS;
     const matched = SAMPLE_QUESTIONS.filter(
@@ -61,8 +63,9 @@ export const BattleModal: React.FC<BattleModalProps> = ({
       setSubmitted(false);
       setOpponentSubmitted(false);
       setOpponentOpt(null);
-      // setOpponentIsCorrect(null);
       setBattleOver(false);
+      setCountdown(null);
+      transitionRef.current = false;
     }
   }, [isOpen, selectedSubject, roomId]);
 
@@ -78,18 +81,18 @@ export const BattleModal: React.FC<BattleModalProps> = ({
         if (data.playerId !== user?.id && data.qIdx === qIdx) {
           setOpponentSubmitted(true);
           setOpponentOpt(data.selectedOpt);
-          // setOpponentIsCorrect(data.isCorrect);
         }
       })
       .on('broadcast', { event: 'next_question' }, (payload) => {
         const data = payload.payload;
         if (typeof data.nextQIdx === 'number') {
+          transitionRef.current = false;
           setQIdx(data.nextQIdx);
           setSelectedOpt(null);
           setSubmitted(false);
           setOpponentSubmitted(false);
           setOpponentOpt(null);
-          // setOpponentIsCorrect(null);
+          setCountdown(null);
         }
       })
       .subscribe();
@@ -98,8 +101,6 @@ export const BattleModal: React.FC<BattleModalProps> = ({
       supabase.removeChannel(channel);
     };
   }, [isOpen, roomId, user?.id, qIdx]);
-
-  if (!isOpen) return null;
 
   const currentQ = filteredQuestions[qIdx] || filteredQuestions[0];
 
@@ -140,11 +141,19 @@ export const BattleModal: React.FC<BattleModalProps> = ({
           isCorrect,
         },
       });
+    } else {
+      // Demo / Single player mode: simulate opponent answer after 600ms
+      setTimeout(() => {
+        setOpponentSubmitted(true);
+        setOpponentOpt(currentQ.correctAnswerIndex);
+      }, 600);
     }
   };
 
   const nextQuestion = () => {
     const nextIdx = qIdx + 1;
+    transitionRef.current = false;
+
     if (nextIdx >= filteredQuestions.length || playerHp <= 0 || opponentHp <= 0) {
       setBattleOver(true);
     } else {
@@ -153,7 +162,7 @@ export const BattleModal: React.FC<BattleModalProps> = ({
       setSubmitted(false);
       setOpponentSubmitted(false);
       setOpponentOpt(null);
-      // setOpponentIsCorrect(null);
+      setCountdown(null);
 
       // Broadcast next question to ALL players in the room
       if (roomId && isSupabaseConfigured()) {
@@ -169,6 +178,24 @@ export const BattleModal: React.FC<BattleModalProps> = ({
     }
   };
 
+  // Auto-advance to next question when BOTH players have answered
+  useEffect(() => {
+    if (submitted && opponentSubmitted && !transitionRef.current && !battleOver) {
+      transitionRef.current = true;
+      setCountdown(2);
+
+      const timer1 = setTimeout(() => setCountdown(1), 1000);
+      const timer2 = setTimeout(() => {
+        nextQuestion();
+      }, 2000);
+
+      return () => {
+        clearTimeout(timer1);
+        clearTimeout(timer2);
+      };
+    }
+  }, [submitted, opponentSubmitted, battleOver]);
+
   const restartBattle = () => {
     setQIdx(0);
     setPlayerHp(100);
@@ -177,8 +204,9 @@ export const BattleModal: React.FC<BattleModalProps> = ({
     setSubmitted(false);
     setOpponentSubmitted(false);
     setOpponentOpt(null);
-    // setOpponentIsCorrect(null);
     setBattleOver(false);
+    setCountdown(null);
+    transitionRef.current = false;
 
     if (roomId && isSupabaseConfigured()) {
       const channel = supabase.channel(`battle_room_${roomId}`);
@@ -189,6 +217,8 @@ export const BattleModal: React.FC<BattleModalProps> = ({
       });
     }
   };
+
+  if (!isOpen) return null;
 
   const bothAnswered = submitted && opponentSubmitted;
   const isBothCorrect =
@@ -309,7 +339,7 @@ export const BattleModal: React.FC<BattleModalProps> = ({
                 <Clock className="w-3.5 h-3.5 text-purple-400" />
                 <span>
                   {submitted
-                    ? 'Siz javob berdingiz ✓'
+                    ? 'Javobingiz qabul qilindi ✓'
                     : 'Javobingizni tanlang...'}
                 </span>
               </div>
@@ -321,8 +351,8 @@ export const BattleModal: React.FC<BattleModalProps> = ({
                     <CheckCircle2 className="w-3.5 h-3.5" /> Raqib ham javob berdi!
                   </span>
                 ) : (
-                  <span className="text-slate-400 animate-pulse">
-                    Raqib javob berishi kutilmoqda...
+                  <span className="text-amber-400 flex items-center gap-1.5 animate-pulse font-medium">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Raqib javob berishi kutilmoqda...
                   </span>
                 )}
               </div>
@@ -368,26 +398,34 @@ export const BattleModal: React.FC<BattleModalProps> = ({
               })}
             </div>
 
-            {/* Answer Explanation & Next Question Action */}
+            {/* Answer Explanation & Automatic Transition Notice */}
             {submitted && (
               <div className="space-y-3 animate-fadeIn">
-                {isBothCorrect && (
-                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-bold text-center">
-                    🎉 Ikkala o'yinchi ham to'g'ri javobni belgiladi!
+                {bothAnswered ? (
+                  <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs md:text-sm font-bold flex items-center justify-between shadow-lg">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      <span>
+                        {isBothCorrect
+                          ? '🎉 Ikkala o\'yinchi ham to\'g\'ri javob berdi!'
+                          : 'Ikkala o\'yinchi ham javob berdi!'}
+                      </span>
+                    </div>
+                    {countdown !== null && (
+                      <span className="bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-xl text-xs font-mono">
+                        {countdown}s da keyingi savol...
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-300 text-xs font-semibold flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-purple-400" />
+                    <span>Javobingiz qabul qilindi. Raqibingiz javob bergach, avtomatik keyingi savolga o'tiladi.</span>
                   </div>
                 )}
 
-                <div className="flex flex-col md:flex-row items-center justify-between p-4 rounded-2xl bg-[#0F1426] border border-slate-800 text-xs md:text-sm gap-4">
-                  <span className="text-slate-300 leading-relaxed">
-                    💡 <strong className="text-white">Tushuntirish:</strong> {currentQ.explanation}
-                  </span>
-                  <button
-                    onClick={nextQuestion}
-                    className="px-6 py-3 rounded-xl font-bold bg-purple-600 hover:bg-purple-500 text-white flex items-center gap-2 shrink-0 shadow-lg shadow-purple-600/30 transition-all w-full md:w-auto justify-center"
-                  >
-                    <span>Keyingi savol</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
+                <div className="p-4 rounded-2xl bg-[#0F1426] border border-slate-800 text-xs md:text-sm text-slate-300 leading-relaxed">
+                  💡 <strong className="text-white">Tushuntirish:</strong> {currentQ.explanation}
                 </div>
               </div>
             )}
