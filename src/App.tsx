@@ -101,6 +101,30 @@ export default function App() {
     setIsDashboardOpen(false);
   };
 
+  const handleRefreshUserProfile = async () => {
+    if (!user?.id || !isSupabaseConfigured()) return;
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (profile) {
+      setUser((prev) =>
+        prev
+          ? {
+              ...prev,
+              xp: profile.xp ?? prev.xp,
+              level: profile.level ?? prev.level,
+              total_battles: profile.total_battles ?? prev.total_battles,
+              battles_won: profile.battles_won ?? prev.battles_won,
+              battles_lost: profile.battles_lost ?? prev.battles_lost,
+            }
+          : null
+      );
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#070913] text-slate-100 flex flex-col font-sans selection:bg-purple-600 selection:text-white">
 
@@ -142,6 +166,7 @@ export default function App() {
       <LeaderboardModal
         isOpen={isLeaderboardOpen}
         onClose={() => setIsLeaderboardOpen(false)}
+        user={user}
       />
 
       <DashboardModal
@@ -181,6 +206,7 @@ export default function App() {
         selectedSubject={selectedSubject}
         user={user}
         roomId={currentRoomId}
+        onUserUpdate={handleRefreshUserProfile}
       />
 
     </div>

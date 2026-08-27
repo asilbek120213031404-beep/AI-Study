@@ -20,6 +20,7 @@ interface BattleModalProps {
   selectedSubject?: string;
   user?: User | null;
   roomId?: string | null;
+  onUserUpdate?: () => void;
 }
 
 const getTableNameBySubject = (subject?: string): string => {
@@ -100,6 +101,7 @@ export const BattleModal: React.FC<BattleModalProps> = ({
   selectedSubject,
   user,
   roomId,
+  onUserUpdate,
 }) => {
   const [qIdx, setQIdx] = useState(0);
   const [playerHp, setPlayerHp] = useState(100);
@@ -119,6 +121,7 @@ export const BattleModal: React.FC<BattleModalProps> = ({
   const [countdown, setCountdown] = useState<number | null>(null);
 
   const transitionRef = useRef(false);
+  const hasSavedResultRef = useRef(false);
 
   // Filter fallback questions based on selected subject
   const fallbackQuestions = React.useMemo(() => {
@@ -205,8 +208,96 @@ export const BattleModal: React.FC<BattleModalProps> = ({
       setBattleOver(false);
       setCountdown(null);
       transitionRef.current = false;
+      hasSavedResultRef.current = false;
     }
   }, [isOpen, selectedSubject, roomId]);
+
+  // Save battle outcome (battles_won / battles_lost) to Supabase profiles table when battle is over
+  useEffect(() => {
+    if (!battleOver || !user?.id || !isSupabaseConfigured() || hasSavedResultRef.current) {
+      return;
+    }
+
+    hasSavedResultRef.current = true;
+    const isWin = opponentHp === 0 || opponentHp < playerHp;
+
+    const saveBattleResult = async () => {
+      try {
+        console.log(`💾 Jang yakunlandi. Supabase'ga saqlash boshlandi... (G'alaba: ${isWin})`);
+
+        // Fetch current profile stats
+        const { data: profile, error: fetchError } = await supabase
+          .from('profiles')
+          .select('battles_won, battles_lost, total_battles, xp')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (fetchError) {
+          console.error('❌ Supabase profil ma\'lumotlarini olishda xatolik:', fetchError.message);
+        }
+
+        if (!profile) {
+          // If profile row doesn't exist, create it with upsert
+          const { error: upsertError } = await supabase.from('profiles').upsert([
+            {
+              id: user.id,
+              full_name: user.name,
+              email: user.email,
+              battles_won: isWin ? 1 : 0,
+              battles_lost: isWin ? 0 : 1,
+              total_battles: 1,
+              xp: isWin ? (user.xp || 500) + 200 : user.xp || 500,
+              updated_at: new Date().toISOString(),
+            },
+          ]);
+
+          if (upsertError) {
+            console.error('❌ Supabase profiles upsert xatosi:', upsertError.message);
+          } else {
+            console.log('✅ Supabase profiles yangi profil va jang natijasi saqlandi!');
+          }
+        } else {
+          // Update existing profile row
+          const currentWon = profile.battles_won ?? 0;
+          const currentLost = profile.battles_lost ?? 0;
+          const currentTotal = profile.total_battles ?? 0;
+          const currentXp = profile.xp ?? 500;
+
+          const newWon = isWin ? currentWon + 1 : currentWon;
+          const newLost = isWin ? currentLost : currentLost + 1;
+          const newTotal = currentTotal + 1;
+          const newXp = isWin ? currentXp + 200 : currentXp;
+
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({
+              battles_won: newWon,
+              battles_lost: newLost,
+              total_battles: newTotal,
+              xp: newXp,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', user.id);
+
+          if (updateError) {
+            console.error('❌ Supabase profiles update xatosi:', updateError.message);
+          } else {
+            console.log(
+              `✅ Supabase profiles yangilandi: battles_won=${newWon}, battles_lost=${newLost}, total_battles=${newTotal}`
+            );
+          }
+        }
+
+        if (onUserUpdate) {
+          onUserUpdate();
+        }
+      } catch (err) {
+        console.error('❌ Jang natijasini saqlashda kutilmagan xatolik:', err);
+      }
+    };
+
+    saveBattleResult();
+  }, [battleOver, user?.id, user?.name, user?.email, user?.xp, opponentHp, playerHp, onUserUpdate]);
 
   // Supabase Realtime Broadcast Listener
   useEffect(() => {
@@ -352,6 +443,7 @@ export const BattleModal: React.FC<BattleModalProps> = ({
     setBattleOver(false);
     setCountdown(null);
     transitionRef.current = false;
+    hasSavedResultRef.current = false;
 
     if (roomId && isSupabaseConfigured()) {
       const channel = supabase.channel(`battle_room_${roomId}`);
