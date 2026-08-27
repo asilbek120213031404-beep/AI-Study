@@ -40,6 +40,9 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({ isOpen, onCl
 
       setIsLoading(true);
       try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const activeUserId = user?.id || session?.user?.id;
+
         const { data, error } = await supabase
           .from('profiles')
           .select('id, full_name, xp, battles_won, total_battles')
@@ -52,7 +55,7 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({ isOpen, onCl
             const won = item.battles_won || 0;
             const total = item.total_battles || 0;
             const winRate = total > 0 ? Math.round((won / total) * 100) : 0;
-            const isUser = Boolean(user?.id && item.id === user.id);
+            const isUser = Boolean(activeUserId && item.id === activeUserId);
 
             return {
               rank,

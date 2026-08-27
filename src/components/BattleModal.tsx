@@ -212,9 +212,9 @@ export const BattleModal: React.FC<BattleModalProps> = ({
     }
   }, [isOpen, selectedSubject, roomId]);
 
-  // Save battle outcome (battles_won / battles_lost) to Supabase profiles table when battle is over
+  // Save battle outcome (battles_won / battles_lost / xp) to Supabase profiles table when battle is over
   useEffect(() => {
-    if (!battleOver || !user?.id || !isSupabaseConfigured() || hasSavedResultRef.current) {
+    if (!battleOver || !isSupabaseConfigured() || hasSavedResultRef.current) {
       return;
     }
 
@@ -223,69 +223,67 @@ export const BattleModal: React.FC<BattleModalProps> = ({
 
     const saveBattleResult = async () => {
       try {
-        console.log(`💾 Jang yakunlandi. Supabase'ga saqlash boshlandi... (G'alaba: ${isWin})`);
+        const { data: sessionData } = await supabase.auth.getSession();
+        const activeUserId = user?.id || sessionData?.session?.user?.id;
+
+        if (!activeUserId) {
+          console.warn('⚠️ User ID topilmadi, Supabase profiles-ga jang natijasi saqlanmadi.');
+          return;
+        }
+
+        console.log(`💾 Jang yakunlandi. Supabase'ga saqlash boshlandi... User: ${activeUserId}, G'alaba: ${isWin}`);
 
         // Fetch current profile stats
-        const { data: profile, error: fetchError } = await supabase
+        const { data: existingProfile, error: fetchError } = await supabase
           .from('profiles')
-          .select('battles_won, battles_lost, total_battles, xp')
-          .eq('id', user.id)
+          .select('battles_won, battles_lost, total_battles, xp, full_name, email')
+          .eq('id', activeUserId)
           .maybeSingle();
 
         if (fetchError) {
           console.error('❌ Supabase profil ma\'lumotlarini olishda xatolik:', fetchError.message);
         }
 
-        if (!profile) {
-          // If profile row doesn't exist, create it with upsert
-          const { error: upsertError } = await supabase.from('profiles').upsert([
+        const currentWon = existingProfile?.battles_won ?? user?.battles_won ?? 0;
+        const currentLost = existingProfile?.battles_lost ?? user?.battles_lost ?? 0;
+        const currentTotal = existingProfile?.total_battles ?? user?.total_battles ?? 0;
+        const currentXp = existingProfile?.xp ?? user?.xp ?? 500;
+
+        const newWon = isWin ? currentWon + 1 : currentWon;
+        const newLost = isWin ? currentLost : currentLost + 1;
+        const newTotal = currentTotal + 1;
+        const newXp = isWin ? currentXp + 200 : currentXp;
+
+        const userName =
+          existingProfile?.full_name ||
+          user?.name ||
+          sessionData?.session?.user?.user_metadata?.full_name ||
+          sessionData?.session?.user?.email?.split('@')[0] ||
+          'O\'yinchi';
+        const userEmail = existingProfile?.email || user?.email || sessionData?.session?.user?.email || '';
+
+        const { error: upsertError } = await supabase
+          .from('profiles')
+          .upsert(
             {
-              id: user.id,
-              full_name: user.name,
-              email: user.email,
-              battles_won: isWin ? 1 : 0,
-              battles_lost: isWin ? 0 : 1,
-              total_battles: 1,
-              xp: isWin ? (user.xp || 500) + 200 : user.xp || 500,
-              updated_at: new Date().toISOString(),
-            },
-          ]);
-
-          if (upsertError) {
-            console.error('❌ Supabase profiles upsert xatosi:', upsertError.message);
-          } else {
-            console.log('✅ Supabase profiles yangi profil va jang natijasi saqlandi!');
-          }
-        } else {
-          // Update existing profile row
-          const currentWon = profile.battles_won ?? 0;
-          const currentLost = profile.battles_lost ?? 0;
-          const currentTotal = profile.total_battles ?? 0;
-          const currentXp = profile.xp ?? 500;
-
-          const newWon = isWin ? currentWon + 1 : currentWon;
-          const newLost = isWin ? currentLost : currentLost + 1;
-          const newTotal = currentTotal + 1;
-          const newXp = isWin ? currentXp + 200 : currentXp;
-
-          const { error: updateError } = await supabase
-            .from('profiles')
-            .update({
+              id: activeUserId,
+              full_name: userName,
+              email: userEmail,
               battles_won: newWon,
               battles_lost: newLost,
               total_battles: newTotal,
               xp: newXp,
               updated_at: new Date().toISOString(),
-            })
-            .eq('id', user.id);
+            },
+            { onConflict: 'id' }
+          );
 
-          if (updateError) {
-            console.error('❌ Supabase profiles update xatosi:', updateError.message);
-          } else {
-            console.log(
-              `✅ Supabase profiles yangilandi: battles_won=${newWon}, battles_lost=${newLost}, total_battles=${newTotal}`
-            );
-          }
+        if (upsertError) {
+          console.error('❌ Supabase profiles upsert xatosi:', upsertError.message);
+        } else {
+          console.log(
+            `✅ Supabase profiles yangilandi: battles_won=${newWon}, battles_lost=${newLost}, total_battles=${newTotal}, xp=${newXp}`
+          );
         }
 
         if (onUserUpdate) {
@@ -297,7 +295,7 @@ export const BattleModal: React.FC<BattleModalProps> = ({
     };
 
     saveBattleResult();
-  }, [battleOver, user?.id, user?.name, user?.email, user?.xp, opponentHp, playerHp, onUserUpdate]);
+  }, [battleOver, user, opponentHp, playerHp, onUserUpdate]);
 
   // Supabase Realtime Broadcast Listener
   useEffect(() => {

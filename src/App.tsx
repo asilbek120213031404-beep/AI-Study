@@ -102,26 +102,29 @@ export default function App() {
   };
 
   const handleRefreshUserProfile = async () => {
-    if (!user?.id || !isSupabaseConfigured()) return;
+    if (!isSupabaseConfigured()) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    const targetId = user?.id || session?.user?.id;
+    if (!targetId) return;
+
     const { data: profile } = await supabase
       .from('profiles')
       .select('*')
-      .eq('id', user.id)
+      .eq('id', targetId)
       .maybeSingle();
 
     if (profile) {
-      setUser((prev) =>
-        prev
-          ? {
-              ...prev,
-              xp: profile.xp ?? prev.xp,
-              level: profile.level ?? prev.level,
-              total_battles: profile.total_battles ?? prev.total_battles,
-              battles_won: profile.battles_won ?? prev.battles_won,
-              battles_lost: profile.battles_lost ?? prev.battles_lost,
-            }
-          : null
-      );
+      setUser({
+        id: targetId,
+        name: profile.full_name || session?.user?.user_metadata?.full_name || session?.user?.email?.split('@')[0] || 'User',
+        email: profile.email || session?.user?.email,
+        xp: profile.xp ?? 500,
+        level: Math.floor((profile.xp ?? 500) / 500) + 1,
+        total_battles: profile.total_battles ?? 0,
+        battles_won: profile.battles_won ?? 0,
+        battles_lost: profile.battles_lost ?? 0,
+        rank: profile.rank ?? 4,
+      });
     }
   };
 
