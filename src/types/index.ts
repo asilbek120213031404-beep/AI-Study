@@ -31,3 +31,18 @@ export interface LeaderboardEntry {
   badge: string;
   isUser?: boolean;
 }
+
+export interface GameRoom {
+  id: string;
+  room_code: string;
+  subject: string;
+  host_id: string;
+  host_name: string | null;
+  host_avatar: string | null;
+  guest_id: string | null;
+  guest_name: string | null;
+  guest_avatar: string | null;
+  status: 'waiting' | 'matched' | 'in_progress' | 'completed' | 'cancelled';
+  created_at?: string;
+  updated_at?: string;
+}

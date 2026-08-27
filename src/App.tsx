@@ -146,9 +146,14 @@ export default function App() {
       <DashboardModal
         isOpen={isDashboardOpen}
         onClose={() => setIsDashboardOpen(false)}
-        onStartBattle={(subject) => {
+        onStartBattle={(subject, directBattle) => {
           setSelectedSubject(subject);
-          setIsMatchmakingOpen(true);
+          if (directBattle) {
+            setIsDashboardOpen(false);
+            setIsBattleOpen(true);
+          } else {
+            setIsMatchmakingOpen(true);
+          }
         }}
         onOpenLeaderboard={() => {
           setIsLeaderboardOpen(true);
