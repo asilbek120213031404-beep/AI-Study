@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { SAMPLE_QUESTIONS } from '../data/questionsData';
 import confetti from 'canvas-confetti';
-import type { User } from '../types';
+import type { User, Question } from '../types';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 interface BattleModalProps {
@@ -21,6 +21,78 @@ interface BattleModalProps {
   user?: User | null;
   roomId?: string | null;
 }
+
+const getTableNameBySubject = (subject?: string): string => {
+  if (!subject) return 'questions_for_it';
+  const s = subject.toLowerCase().trim();
+  if (s.includes('math') || s.includes('matematika')) return 'questions_for_math';
+  if (s.includes('hist') || s.includes('tarix')) return 'questions_for_history';
+  if (s.includes('phys') || s.includes('fizika')) return 'questions_for_physics';
+  if (s.includes('it') || s.includes('dasturlash') || s.includes('kod')) return 'questions_for_it';
+  return 'questions_for_it';
+};
+
+const mapRowToQuestion = (q: any, i: number, defaultSubject: string): Question => {
+  const questionText = q.question || q.savol || q.text || q.title || q.content || 'Savol matni';
+
+  let opts: string[] = [];
+  if (Array.isArray(q.options)) {
+    opts = q.options;
+  } else if (Array.isArray(q.variantlar)) {
+    opts = q.variantlar;
+  } else if (Array.isArray(q.variants)) {
+    opts = q.variants;
+  } else if (typeof q.options === 'string') {
+    try {
+      const parsed = JSON.parse(q.options);
+      if (Array.isArray(parsed)) opts = parsed;
+    } catch (e) {}
+  }
+
+  if (opts.length === 0) {
+    const rawOpts = [
+      q.option1 || q.a || q.variant_a || q.option_a,
+      q.option2 || q.b || q.variant_b || q.option_b,
+      q.option3 || q.c || q.variant_c || q.option_c,
+      q.option4 || q.d || q.variant_d || q.option_d,
+    ].filter(Boolean);
+
+    if (rawOpts.length > 0) {
+      opts = rawOpts;
+    } else {
+      opts = ['Variant A', 'Variant B', 'Variant C', 'Variant D'];
+    }
+  }
+
+  let correctIdx = 0;
+  if (typeof q.correct_answer_index === 'number') {
+    correctIdx = q.correct_answer_index;
+  } else if (typeof q.correctAnswerIndex === 'number') {
+    correctIdx = q.correctAnswerIndex;
+  } else if (typeof q.togri_javob_index === 'number') {
+    correctIdx = q.togri_javob_index;
+  } else if (q.correct_answer || q.togri_javob || q.correct_option || q.answer) {
+    const target = (q.correct_answer || q.togri_javob || q.correct_option || q.answer).toString().trim();
+    if (/^[0-3]$/.test(target)) {
+      correctIdx = parseInt(target, 10);
+    } else if (/^[a-dA-D]$/.test(target)) {
+      correctIdx = target.toUpperCase().charCodeAt(0) - 65;
+    } else {
+      const matchedIndex = opts.findIndex((o) => o.trim().toLowerCase() === target.toLowerCase());
+      if (matchedIndex !== -1) correctIdx = matchedIndex;
+    }
+  }
+
+  return {
+    id: q.id?.toString() || `q_${i}`,
+    subject: defaultSubject || q.subject || 'Dasturlash',
+    difficulty: q.difficulty || q.qiyinlik || q.daraja || 'O\'rtacha',
+    question: questionText,
+    options: opts,
+    correctAnswerIndex: Math.max(0, Math.min(opts.length - 1, correctIdx)),
+    explanation: q.explanation || q.izoh || q.tushuntirish || 'Tushuntirish berilmagan.',
+  };
+};
 
 export const BattleModal: React.FC<BattleModalProps> = ({
   isOpen,
@@ -35,6 +107,10 @@ export const BattleModal: React.FC<BattleModalProps> = ({
   const [selectedOpt, setSelectedOpt] = useState<number | null>(null);
   const [submitted, setSubmitted] = useState(false);
 
+  // Questions state from Supabase
+  const [questions, setQuestions] = useState<Question[]>(SAMPLE_QUESTIONS);
+  const [isLoadingQuestions, setIsLoadingQuestions] = useState(false);
+
   // Opponent Realtime state
   const [opponentSubmitted, setOpponentSubmitted] = useState(false);
   const [opponentOpt, setOpponentOpt] = useState<number | null>(null);
@@ -44,8 +120,8 @@ export const BattleModal: React.FC<BattleModalProps> = ({
 
   const transitionRef = useRef(false);
 
-  // Filter questions based on selected subject if matched
-  const filteredQuestions = React.useMemo(() => {
+  // Filter fallback questions based on selected subject
+  const fallbackQuestions = React.useMemo(() => {
     if (!selectedSubject) return SAMPLE_QUESTIONS;
     const matched = SAMPLE_QUESTIONS.filter(
       (q) => q.subject.toLowerCase() === selectedSubject.toLowerCase()
@@ -53,7 +129,70 @@ export const BattleModal: React.FC<BattleModalProps> = ({
     return matched.length > 0 ? matched : SAMPLE_QUESTIONS;
   }, [selectedSubject]);
 
-  // Reset state on open
+  // Fetch 10 random questions from Supabase based on subject table
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let isMounted = true;
+    setQuestions(fallbackQuestions);
+
+    const fetchQuestionsFromSupabase = async () => {
+      if (!isSupabaseConfigured()) return;
+      setIsLoadingQuestions(true);
+
+      const tableName = getTableNameBySubject(selectedSubject);
+      console.log(`🌐 Supabase'dan savollar yuklanmoqda: ${tableName}`);
+
+      try {
+        let { data, error } = await supabase.from(tableName).select('*');
+
+        // Fallback: If table is empty or error, try unified 'questions' table
+        if (error || !data || data.length === 0) {
+          console.log(`Fallback strategy check for subject: ${selectedSubject}`);
+          const fallbackRes = await supabase
+            .from('questions')
+            .select('*')
+            .eq('subject', selectedSubject || 'Dasturlash');
+
+          if (fallbackRes.data && fallbackRes.data.length > 0) {
+            data = fallbackRes.data;
+          }
+        }
+
+        if (data && data.length > 0 && isMounted) {
+          const mappedQuestions: Question[] = data.map((q: any, i: number) =>
+            mapRowToQuestion(q, i, selectedSubject || 'Dasturlash')
+          );
+
+          // Pick 10 random questions
+          const shuffled = [...mappedQuestions].sort(() => 0.5 - Math.random()).slice(0, 10);
+          setQuestions(shuffled);
+
+          // Broadcast 10 selected questions to opponent so both players get exact same set
+          if (roomId && isSupabaseConfigured()) {
+            const channel = supabase.channel(`battle_room_${roomId}`);
+            channel.send({
+              type: 'broadcast',
+              event: 'questions_loaded',
+              payload: { questions: shuffled },
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Savollarni yuklashda xatolik:', err);
+      } finally {
+        if (isMounted) setIsLoadingQuestions(false);
+      }
+    };
+
+    fetchQuestionsFromSupabase();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen, selectedSubject, roomId, fallbackQuestions]);
+
+  // Reset battle state on open
   useEffect(() => {
     if (isOpen) {
       setQIdx(0);
@@ -95,6 +234,12 @@ export const BattleModal: React.FC<BattleModalProps> = ({
           setCountdown(null);
         }
       })
+      .on('broadcast', { event: 'questions_loaded' }, (payload) => {
+        const data = payload.payload;
+        if (Array.isArray(data.questions) && data.questions.length > 0) {
+          setQuestions(data.questions);
+        }
+      })
       .subscribe();
 
     return () => {
@@ -102,10 +247,10 @@ export const BattleModal: React.FC<BattleModalProps> = ({
     };
   }, [isOpen, roomId, user?.id, qIdx]);
 
-  const currentQ = filteredQuestions[qIdx] || filteredQuestions[0];
+  const currentQ = questions[qIdx] || questions[0] || fallbackQuestions[0];
 
   const handleSelect = (idx: number) => {
-    if (submitted) return;
+    if (submitted || !currentQ) return;
     setSelectedOpt(idx);
     setSubmitted(true);
 
@@ -142,7 +287,7 @@ export const BattleModal: React.FC<BattleModalProps> = ({
         },
       });
     } else {
-      // Demo / Single player mode: simulate opponent answer after 600ms
+      // Single player / demo fallback: simulate opponent answer
       setTimeout(() => {
         setOpponentSubmitted(true);
         setOpponentOpt(currentQ.correctAnswerIndex);
@@ -154,7 +299,7 @@ export const BattleModal: React.FC<BattleModalProps> = ({
     const nextIdx = qIdx + 1;
     transitionRef.current = false;
 
-    if (nextIdx >= filteredQuestions.length || playerHp <= 0 || opponentHp <= 0) {
+    if (nextIdx >= questions.length || playerHp <= 0 || opponentHp <= 0) {
       setBattleOver(true);
     } else {
       setQIdx(nextIdx);
@@ -164,7 +309,7 @@ export const BattleModal: React.FC<BattleModalProps> = ({
       setOpponentOpt(null);
       setCountdown(null);
 
-      // Broadcast next question to ALL players in the room
+      // Broadcast next question index to ALL players in room
       if (roomId && isSupabaseConfigured()) {
         const channel = supabase.channel(`battle_room_${roomId}`);
         channel.send({
@@ -223,6 +368,7 @@ export const BattleModal: React.FC<BattleModalProps> = ({
   const bothAnswered = submitted && opponentSubmitted;
   const isBothCorrect =
     bothAnswered &&
+    currentQ &&
     selectedOpt === currentQ.correctAnswerIndex &&
     opponentOpt === currentQ.correctAnswerIndex;
 
@@ -359,47 +505,58 @@ export const BattleModal: React.FC<BattleModalProps> = ({
             </div>
 
             {/* Question Card */}
-            <div className="bg-[#0F1426] p-6 rounded-2xl border border-slate-800/80 space-y-3 shadow-lg">
-              <div className="flex items-center justify-between text-xs font-semibold">
-                <span className="text-purple-400 bg-purple-500/10 px-3 py-1 rounded-lg border border-purple-500/20">
-                  Savol {qIdx + 1} / {filteredQuestions.length} • {currentQ.subject}
+            {isLoadingQuestions ? (
+              <div className="bg-[#0F1426] p-12 rounded-2xl border border-slate-800/80 flex flex-col items-center justify-center space-y-3 text-purple-400">
+                <Loader2 className="w-8 h-8 animate-spin" />
+                <span className="text-sm font-bold text-slate-300">
+                  Supabase'dan {selectedSubject || 'Dasturlash'} fanidan 10 ta savollar yuklanmoqda...
                 </span>
-                <span className="text-slate-400 font-mono">Qiyinlik: {currentQ.difficulty}</span>
               </div>
-              <p className="font-bold text-lg md:text-xl text-white leading-snug pt-1">
-                {currentQ.question}
-              </p>
-            </div>
+            ) : currentQ ? (
+              <>
+                <div className="bg-[#0F1426] p-6 rounded-2xl border border-slate-800/80 space-y-3 shadow-lg">
+                  <div className="flex items-center justify-between text-xs font-semibold">
+                    <span className="text-purple-400 bg-purple-500/10 px-3 py-1 rounded-lg border border-purple-500/20">
+                      Savol {qIdx + 1} / {questions.length} • {currentQ.subject}
+                    </span>
+                    <span className="text-slate-400 font-mono">Qiyinlik: {currentQ.difficulty}</span>
+                  </div>
+                  <p className="font-bold text-lg md:text-xl text-white leading-snug pt-1">
+                    {currentQ.question}
+                  </p>
+                </div>
 
-            {/* 4 Option Buttons Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-              {currentQ.options.map((opt, idx) => {
-                let btnStyle = 'bg-[#0F1426] hover:bg-slate-800/80 border-slate-800/80 text-slate-200';
-                if (submitted) {
-                  if (idx === currentQ.correctAnswerIndex) {
-                    btnStyle = 'bg-emerald-500/20 border-emerald-500 text-emerald-300 font-bold shadow-[0_0_15px_rgba(16,185,129,0.3)]';
-                  } else if (idx === selectedOpt) {
-                    btnStyle = 'bg-rose-500/20 border-rose-500 text-rose-300 font-bold';
-                  } else {
-                    btnStyle = 'opacity-40 bg-slate-900 border-slate-800 text-slate-500';
-                  }
-                }
-                return (
-                  <button
-                    key={idx}
-                    disabled={submitted}
-                    onClick={() => handleSelect(idx)}
-                    className={`p-4 rounded-2xl border text-sm md:text-base font-semibold text-left transition-all ${btnStyle}`}
-                  >
-                    <span className="mr-2 text-slate-400 font-mono">{String.fromCharCode(65 + idx)})</span>
-                    {opt}
-                  </button>
-                );
-              })}
-            </div>
+                {/* 4 Option Buttons Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                  {currentQ.options.map((opt, idx) => {
+                    let btnStyle = 'bg-[#0F1426] hover:bg-slate-800/80 border-slate-800/80 text-slate-200';
+                    if (submitted) {
+                      if (idx === currentQ.correctAnswerIndex) {
+                        btnStyle = 'bg-emerald-500/20 border-emerald-500 text-emerald-300 font-bold shadow-[0_0_15px_rgba(16,185,129,0.3)]';
+                      } else if (idx === selectedOpt) {
+                        btnStyle = 'bg-rose-500/20 border-rose-500 text-rose-300 font-bold';
+                      } else {
+                        btnStyle = 'opacity-40 bg-slate-900 border-slate-800 text-slate-500';
+                      }
+                    }
+                    return (
+                      <button
+                        key={idx}
+                        disabled={submitted}
+                        onClick={() => handleSelect(idx)}
+                        className={`p-4 rounded-2xl border text-sm md:text-base font-semibold text-left transition-all ${btnStyle}`}
+                      >
+                        <span className="mr-2 text-slate-400 font-mono">{String.fromCharCode(65 + idx)})</span>
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            ) : null}
 
             {/* Answer Explanation & Automatic Transition Notice */}
-            {submitted && (
+            {submitted && currentQ && (
               <div className="space-y-3 animate-fadeIn">
                 {bothAnswered ? (
                   <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs md:text-sm font-bold flex items-center justify-between shadow-lg">
