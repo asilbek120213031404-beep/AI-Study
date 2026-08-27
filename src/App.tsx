@@ -18,6 +18,7 @@ export default function App() {
   const [isDashboardOpen, setIsDashboardOpen] = useState(false);
   const [isMatchmakingOpen, setIsMatchmakingOpen] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState<string | undefined>();
+  const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
@@ -146,8 +147,9 @@ export default function App() {
       <DashboardModal
         isOpen={isDashboardOpen}
         onClose={() => setIsDashboardOpen(false)}
-        onStartBattle={(subject, directBattle) => {
+        onStartBattle={(subject, directBattle, roomId) => {
           setSelectedSubject(subject);
+          if (roomId) setCurrentRoomId(roomId);
           if (directBattle) {
             setIsDashboardOpen(false);
             setIsBattleOpen(true);
@@ -166,7 +168,8 @@ export default function App() {
         onClose={() => setIsMatchmakingOpen(false)}
         subject={selectedSubject}
         user={user}
-        onStartBattle={() => {
+        onStartBattle={(roomId) => {
+          if (roomId) setCurrentRoomId(roomId);
           setIsMatchmakingOpen(false);
           setIsBattleOpen(true);
         }}
@@ -176,6 +179,8 @@ export default function App() {
         isOpen={isBattleOpen}
         onClose={() => setIsBattleOpen(false)}
         selectedSubject={selectedSubject}
+        user={user}
+        roomId={currentRoomId}
       />
 
     </div>

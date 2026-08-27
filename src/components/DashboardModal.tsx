@@ -25,7 +25,7 @@ import { JoinBattleSection } from './JoinBattleSection';
 interface DashboardModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onStartBattle: (subject?: string, directBattle?: boolean) => void;
+  onStartBattle: (subject?: string, directBattle?: boolean, roomId?: string) => void;
   onOpenLeaderboard: () => void;
   user: User | null;
 }

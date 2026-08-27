@@ -15,7 +15,7 @@ import {
 
 interface JoinBattleSectionProps {
   user: User | null;
-  onStartBattle: (subject?: string, directBattle?: boolean) => void;
+  onStartBattle: (subject?: string, directBattle?: boolean, roomId?: string) => void;
 }
 
 export const JoinBattleSection: React.FC<JoinBattleSectionProps> = ({
@@ -95,7 +95,7 @@ export const JoinBattleSection: React.FC<JoinBattleSectionProps> = ({
         (payload) => {
           const updated = payload.new as GameRoom;
           if (updated.status === 'in_progress') {
-            onStartBattle(updated.subject, true);
+            onStartBattle(updated.subject, true, updated.id);
           } else if (updated.status === 'cancelled') {
             setWaitingForHost(false);
             setJoinedRoom(null);
@@ -178,7 +178,7 @@ export const JoinBattleSection: React.FC<JoinBattleSectionProps> = ({
       setJoinedRoom(currentRoom);
 
       if (currentRoom.status === 'in_progress') {
-        onStartBattle(currentRoom.subject, true);
+        onStartBattle(currentRoom.subject, true, currentRoom.id);
       } else {
         setWaitingForHost(true);
       }

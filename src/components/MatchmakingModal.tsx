@@ -24,7 +24,7 @@ interface MatchmakingModalProps {
   onClose: () => void;
   subject?: string;
   user: User | null;
-  onStartBattle: () => void;
+  onStartBattle: (roomId?: string) => void;
 }
 
 export const MatchmakingModal: React.FC<
@@ -194,7 +194,7 @@ export const MatchmakingModal: React.FC<
           setIsStartingBattle(false);
         }
       }
-      onStartBattle();
+      onStartBattle(roomId || undefined);
     };
 
     const handleClose = async () => {
