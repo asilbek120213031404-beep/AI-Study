@@ -102,7 +102,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#070913] text-slate-100 flex flex-col font-sans selection:bg-purple-600 selection:text-white">
-      
+
       {/* Header Bar */}
       <Header
         onOpenLogin={() => {
