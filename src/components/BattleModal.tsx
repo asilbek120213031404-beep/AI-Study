@@ -38,7 +38,7 @@ export const BattleModal: React.FC<BattleModalProps> = ({
   // Opponent Realtime state
   const [opponentSubmitted, setOpponentSubmitted] = useState(false);
   const [opponentOpt, setOpponentOpt] = useState<number | null>(null);
-  const [opponentIsCorrect, setOpponentIsCorrect] = useState<boolean | null>(null);
+  // const [opponentIsCorrect, setOpponentIsCorrect] = useState<boolean | null>(null);
 
   const [battleOver, setBattleOver] = useState(false);
 
@@ -61,7 +61,7 @@ export const BattleModal: React.FC<BattleModalProps> = ({
       setSubmitted(false);
       setOpponentSubmitted(false);
       setOpponentOpt(null);
-      setOpponentIsCorrect(null);
+      // setOpponentIsCorrect(null);
       setBattleOver(false);
     }
   }, [isOpen, selectedSubject, roomId]);
@@ -78,7 +78,7 @@ export const BattleModal: React.FC<BattleModalProps> = ({
         if (data.playerId !== user?.id && data.qIdx === qIdx) {
           setOpponentSubmitted(true);
           setOpponentOpt(data.selectedOpt);
-          setOpponentIsCorrect(data.isCorrect);
+          // setOpponentIsCorrect(data.isCorrect);
         }
       })
       .on('broadcast', { event: 'next_question' }, (payload) => {
@@ -89,7 +89,7 @@ export const BattleModal: React.FC<BattleModalProps> = ({
           setSubmitted(false);
           setOpponentSubmitted(false);
           setOpponentOpt(null);
-          setOpponentIsCorrect(null);
+          // setOpponentIsCorrect(null);
         }
       })
       .subscribe();
@@ -153,7 +153,7 @@ export const BattleModal: React.FC<BattleModalProps> = ({
       setSubmitted(false);
       setOpponentSubmitted(false);
       setOpponentOpt(null);
-      setOpponentIsCorrect(null);
+      // setOpponentIsCorrect(null);
 
       // Broadcast next question to ALL players in the room
       if (roomId && isSupabaseConfigured()) {
@@ -177,7 +177,7 @@ export const BattleModal: React.FC<BattleModalProps> = ({
     setSubmitted(false);
     setOpponentSubmitted(false);
     setOpponentOpt(null);
-    setOpponentIsCorrect(null);
+    // setOpponentIsCorrect(null);
     setBattleOver(false);
 
     if (roomId && isSupabaseConfigured()) {
