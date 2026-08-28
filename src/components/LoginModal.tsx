@@ -255,6 +255,42 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
               <h3 className="text-base font-bold text-white mb-2">Hisob yaratish</h3>
             </div>
 
+            {/* Google Sign In / Registration Button */}
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={handleGoogleLogin}
+              className="w-full py-3 px-4 bg-[#121626] hover:bg-[#1A1F36] border border-slate-800 rounded-xl flex items-center justify-center gap-3 text-xs font-semibold text-slate-200 transition-colors shadow-sm disabled:opacity-50"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24">
+                <path
+                  fill="#EA4335"
+                  d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"
+                />
+                <path
+                  fill="#4285F4"
+                  d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 10.8 0 12s.7 2.3 1.9 4.7l3.7-2.9z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16C3.7 19.7 7.5 23 12 23z"
+                />
+              </svg>
+              <span>Google orqali ro'yxatdan o'tish</span>
+            </button>
+
+            {/* Divider */}
+            <div className="relative flex items-center justify-center my-2">
+              <div className="w-full border-t border-slate-800" />
+              <span className="bg-[#0B0E1A] px-3 text-[11px] font-medium text-slate-500 uppercase tracking-widest absolute">
+                yoki
+              </span>
+            </div>
+
             {/* Registration Form */}
             <form onSubmit={handleSubmit} className="space-y-3.5">
 
