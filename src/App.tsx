@@ -24,31 +24,89 @@ export default function App() {
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
 
+    // Helper to process session and ensure DB profile exists
+    const handleAuthUser = async (userSession: any) => {
+      if (!userSession?.user) return;
+
+      let { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userSession.user.id)
+        .maybeSingle();
+
+      // If no profile exists yet (e.g. first-time Google OAuth login), create profile record
+      if (!profile) {
+        const defaultName =
+          userSession.user.user_metadata?.full_name ||
+          userSession.user.user_metadata?.name ||
+          userSession.user.email?.split('@')[0] ||
+          'Foydalanuvchi';
+
+        const defaultUsername =
+          userSession.user.user_metadata?.username ||
+          userSession.user.email?.split('@')[0] ||
+          'user';
+
+        const defaultAvatar =
+          userSession.user.user_metadata?.avatar_url ||
+          userSession.user.user_metadata?.picture;
+
+        const { data: newProfile } = await supabase
+          .from('profiles')
+          .upsert([
+            {
+              id: userSession.user.id,
+              full_name: defaultName,
+              email: userSession.user.email,
+              username: defaultUsername,
+              avatar_url: defaultAvatar,
+              provider: 'google',
+              level: 1,
+              xp: 500,
+              rank: 5,
+              total_battles: 0,
+              battles_won: 0,
+              battles_lost: 0
+            }
+          ], { onConflict: 'id' })
+          .select()
+          .maybeSingle();
+
+        if (newProfile) {
+          profile = newProfile;
+        }
+      }
+
+      const userDisplayName =
+        profile?.username ||
+        profile?.full_name ||
+        userSession.user.user_metadata?.username ||
+        userSession.user.user_metadata?.full_name ||
+        userSession.user.email?.split('@')[0] ||
+        'User';
+
+      setUser({
+        id: userSession.user.id,
+        name: userDisplayName,
+        username: profile?.username || userSession.user.user_metadata?.username || userSession.user.email?.split('@')[0],
+        email: userSession.user.email,
+        avatar: profile?.avatar_url || userSession.user.user_metadata?.avatar_url || userSession.user.user_metadata?.picture,
+        xp: profile?.xp ?? 500,
+        level: profile?.level ?? Math.min(10, Math.floor((profile?.xp ?? 500) / 1000) + 1),
+        total_battles: profile?.total_battles ?? 0,
+        battles_won: profile?.battles_won ?? 0,
+        battles_lost: profile?.battles_lost ?? 0,
+        rank: profile?.rank ?? 4
+      });
+
+      setIsLoginOpen(false);
+    };
+
     // Check active session on load
     const fetchSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .maybeSingle();
-
-        const userDisplayName = profile?.username || profile?.full_name || session.user.user_metadata?.username || session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User';
-
-        setUser({
-          id: session.user.id,
-          name: userDisplayName,
-          username: profile?.username || session.user.user_metadata?.username || session.user.email?.split('@')[0],
-          email: session.user.email,
-          avatar: profile?.avatar_url || session.user.user_metadata?.avatar_url,
-          xp: profile?.xp || 500,
-          level: profile?.level || 1,
-          total_battles: profile?.total_battles || 0,
-          battles_won: profile?.battles_won || 0,
-          battles_lost: profile?.battles_lost || 0,
-          rank: profile?.rank || 4
-        });
+        await handleAuthUser(session);
       }
     };
 
@@ -57,27 +115,7 @@ export default function App() {
     // Listen to Supabase auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .maybeSingle();
-
-        const userDisplayName = profile?.username || profile?.full_name || session.user.user_metadata?.username || session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User';
-
-        setUser({
-          id: session.user.id,
-          name: userDisplayName,
-          username: profile?.username || session.user.user_metadata?.username || session.user.email?.split('@')[0],
-          email: session.user.email,
-          avatar: profile?.avatar_url || session.user.user_metadata?.avatar_url,
-          xp: profile?.xp || 500,
-          level: profile?.level || 1,
-          total_battles: profile?.total_battles || 0,
-          battles_won: profile?.battles_won || 0,
-          battles_lost: profile?.battles_lost || 0,
-          rank: profile?.rank || 4
-        });
+        await handleAuthUser(session);
       } else {
         setUser(null);
       }
