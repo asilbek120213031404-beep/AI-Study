@@ -180,7 +180,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
         const { error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
           options: {
-            redirectTo: 'https://aistudy-ashy.vercel.app'
+            redirectTo: window.location.origin
           }
         });
         if (error) throw error;
