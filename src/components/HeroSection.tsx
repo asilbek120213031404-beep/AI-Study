@@ -21,23 +21,23 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onStartBattle, onOpenL
           Bilimingizni real vaqt rejimida raqobatbardosh tajribaga aylantiring. Fanlarni tanlang, bilimlaingizni sinovdan o'tkazing va peshqadamlar qatoriga qo'shiling.
         </p>
 
-        <div className="flex flex-wrap items-center gap-4 pt-2">
+        <div className="grid grid-cols-2 gap-2.5 sm:flex sm:flex-wrap sm:items-center sm:gap-4 pt-2">
           {/* Jangni boshlash button */}
           <button
             onClick={onStartBattle}
-            className="flex items-center gap-2 px-6 py-3.5 rounded-xl font-bold text-sm text-white btn-primary-purple"
+            className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 py-2.5 sm:px-6 sm:py-3.5 rounded-xl font-bold text-xs sm:text-sm text-white btn-primary-purple transition-all shadow-md"
           >
-            <Swords className="w-4 h-4" />
-            <span>Jangni boshlash</span>
+            <Swords className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <span className="truncate">Jangni boshlash</span>
           </button>
 
           {/* Reytingni ko'rish button */}
           <button
             onClick={onOpenLeaderboard}
-            className="flex items-center gap-2 px-6 py-3.5 rounded-xl font-bold text-sm text-slate-200 bg-[#0D111F] hover:bg-slate-800 border border-slate-700/80 transition-colors"
+            className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 py-2.5 sm:px-6 sm:py-3.5 rounded-xl font-bold text-xs sm:text-sm text-slate-200 bg-[#0D111F] hover:bg-slate-800 border border-slate-700/80 transition-all shadow-sm"
           >
-            <BarChart3 className="w-4 h-4 text-slate-400" />
-            <span>Reytingni ko'rish</span>
+            <BarChart3 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 shrink-0" />
+            <span className="truncate">Reytingni ko'rish</span>
           </button>
         </div>
       </div>

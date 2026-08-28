@@ -41,5 +41,23 @@ export const SAMPLE_QUESTIONS: Question[] = [
     options: ['1336-yil', '1340-yil', '1405-yil', '1380-yil'],
     correctAnswerIndex: 0,
     explanation: 'Amir Temur 1336-yil 9-aprelda Shahrisabz yaqinidagi Xo\'ja Ilg\'or qishlog\'ida tug\'ilgan.'
+  },
+  {
+    id: 'q5',
+    subject: 'Python',
+    difficulty: 'O\'rtacha',
+    question: 'Python da ro\'yxat (list) ga yangi element qo\'shish uchun qaysi metod ishlatiladi?',
+    options: ['push()', 'append()', 'add()', 'insert_last()'],
+    correctAnswerIndex: 1,
+    explanation: 'Python list ob’yektida elementni oxiriga qo\'shish uchun append() metodi ishlatiladi.'
+  },
+  {
+    id: 'q6',
+    subject: 'Python',
+    difficulty: 'Oson',
+    question: 'Python dasturlash tilida izoh (comment) qaysi belgi bilan boshlanadi?',
+    options: ['//', '/*', '#', '<!--'],
+    correctAnswerIndex: 2,
+    explanation: 'Python da bir qatorli izohlar `#` belgisi bilan boshlanadi.'
   }
 ];

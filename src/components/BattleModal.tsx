@@ -26,9 +26,11 @@ interface BattleModalProps {
 const getTableNameBySubject = (subject?: string): string => {
   if (!subject) return 'questions_for_it';
   const s = subject.toLowerCase().trim();
+  if (s.includes('python')) return 'questions_for_python';
   if (s.includes('math') || s.includes('matematika')) return 'questions_for_math';
   if (s.includes('hist') || s.includes('tarix')) return 'questions_for_history';
   if (s.includes('phys') || s.includes('fizika')) return 'questions_for_physics';
+  if (s.includes('eng') || s.includes('ingliz')) return 'questions_for_english';
   if (s.includes('it') || s.includes('dasturlash') || s.includes('kod')) return 'questions_for_it';
   return 'questions_for_it';
 };
@@ -236,7 +238,7 @@ export const BattleModal: React.FC<BattleModalProps> = ({
         // Fetch current profile stats
         const { data: existingProfile, error: fetchError } = await supabase
           .from('profiles')
-          .select('battles_won, battles_lost, total_battles, xp, full_name, email')
+          .select('battles_won, battles_lost, total_battles, xp, level, full_name, username, email')
           .eq('id', activeUserId)
           .maybeSingle();
 
@@ -244,15 +246,16 @@ export const BattleModal: React.FC<BattleModalProps> = ({
           console.error('❌ Supabase profil ma\'lumotlarini olishda xatolik:', fetchError.message);
         }
 
-        const currentWon = existingProfile?.battles_won ?? user?.battles_won ?? 0;
-        const currentLost = existingProfile?.battles_lost ?? user?.battles_lost ?? 0;
-        const currentTotal = existingProfile?.total_battles ?? user?.total_battles ?? 0;
-        const currentXp = existingProfile?.xp ?? user?.xp ?? 500;
+        const currentWon = Number(existingProfile?.battles_won ?? user?.battles_won ?? 0);
+        const currentLost = Number(existingProfile?.battles_lost ?? user?.battles_lost ?? 0);
+        const currentTotal = Number(existingProfile?.total_battles ?? user?.total_battles ?? (currentWon + currentLost));
+        const currentXp = Number(existingProfile?.xp ?? user?.xp ?? 500);
 
         const newWon = isWin ? currentWon + 1 : currentWon;
         const newLost = isWin ? currentLost : currentLost + 1;
         const newTotal = currentTotal + 1;
         const newXp = isWin ? currentXp + 200 : currentXp;
+        const newLevel = Math.min(10, Math.floor(newXp / 1000) + 1);
 
         const userName =
           existingProfile?.full_name ||
@@ -261,6 +264,7 @@ export const BattleModal: React.FC<BattleModalProps> = ({
           sessionData?.session?.user?.email?.split('@')[0] ||
           'O\'yinchi';
         const userEmail = existingProfile?.email || user?.email || sessionData?.session?.user?.email || '';
+        const userUsername = existingProfile?.username || user?.username || sessionData?.session?.user?.user_metadata?.username;
 
         const { error: upsertError } = await supabase
           .from('profiles')
@@ -268,11 +272,13 @@ export const BattleModal: React.FC<BattleModalProps> = ({
             {
               id: activeUserId,
               full_name: userName,
+              username: userUsername || undefined,
               email: userEmail,
               battles_won: newWon,
               battles_lost: newLost,
               total_battles: newTotal,
               xp: newXp,
+              level: newLevel,
               updated_at: new Date().toISOString(),
             },
             { onConflict: 'id' }
@@ -282,7 +288,7 @@ export const BattleModal: React.FC<BattleModalProps> = ({
           console.error('❌ Supabase profiles upsert xatosi:', upsertError.message);
         } else {
           console.log(
-            `✅ Supabase profiles yangilandi: battles_won=${newWon}, battles_lost=${newLost}, total_battles=${newTotal}, xp=${newXp}`
+            `✅ Supabase profiles muvaffaqiyatli yangilandi: G'alaba=${newWon}, Mag'lubiyat=${newLost}, Jami=${newTotal}, XP=${newXp}, Level=${newLevel}`
           );
         }
 

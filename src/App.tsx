@@ -32,18 +32,22 @@ export default function App() {
           .from('profiles')
           .select('*')
           .eq('id', session.user.id)
-          .single();
+          .maybeSingle();
+
+        const userDisplayName = profile?.username || profile?.full_name || session.user.user_metadata?.username || session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User';
 
         setUser({
           id: session.user.id,
-          name: profile?.full_name || session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
+          name: userDisplayName,
+          username: profile?.username || session.user.user_metadata?.username || session.user.email?.split('@')[0],
           email: session.user.email,
+          avatar: profile?.avatar_url || session.user.user_metadata?.avatar_url,
           xp: profile?.xp || 500,
           level: profile?.level || 1,
           total_battles: profile?.total_battles || 0,
           battles_won: profile?.battles_won || 0,
           battles_lost: profile?.battles_lost || 0,
-          rank: 4
+          rank: profile?.rank || 4
         });
       }
     };
@@ -57,18 +61,22 @@ export default function App() {
           .from('profiles')
           .select('*')
           .eq('id', session.user.id)
-          .single();
+          .maybeSingle();
+
+        const userDisplayName = profile?.username || profile?.full_name || session.user.user_metadata?.username || session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User';
 
         setUser({
           id: session.user.id,
-          name: profile?.full_name || session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
+          name: userDisplayName,
+          username: profile?.username || session.user.user_metadata?.username || session.user.email?.split('@')[0],
           email: session.user.email,
+          avatar: profile?.avatar_url || session.user.user_metadata?.avatar_url,
           xp: profile?.xp || 500,
           level: profile?.level || 1,
           total_battles: profile?.total_battles || 0,
           battles_won: profile?.battles_won || 0,
           battles_lost: profile?.battles_lost || 0,
-          rank: 4
+          rank: profile?.rank || 4
         });
       } else {
         setUser(null);
@@ -114,12 +122,16 @@ export default function App() {
       .maybeSingle();
 
     if (profile) {
+      const userDisplayName = profile.username || profile.full_name || session?.user?.user_metadata?.username || session?.user?.user_metadata?.full_name || session?.user?.email?.split('@')[0] || 'User';
+
       setUser({
         id: targetId,
-        name: profile.full_name || session?.user?.user_metadata?.full_name || session?.user?.email?.split('@')[0] || 'User',
+        name: userDisplayName,
+        username: profile.username || session?.user?.user_metadata?.username || session?.user?.email?.split('@')[0],
         email: profile.email || session?.user?.email,
+        avatar: profile.avatar_url || session?.user?.user_metadata?.avatar_url,
         xp: profile.xp ?? 500,
-        level: Math.floor((profile.xp ?? 500) / 500) + 1,
+        level: profile.level ?? Math.min(10, Math.floor((profile.xp ?? 500) / 1000) + 1),
         total_battles: profile.total_battles ?? 0,
         battles_won: profile.battles_won ?? 0,
         battles_lost: profile.battles_lost ?? 0,
@@ -189,6 +201,7 @@ export default function App() {
           setIsLeaderboardOpen(true);
         }}
         user={user}
+        onUserUpdate={handleRefreshUserProfile}
       />
 
       <MatchmakingModal

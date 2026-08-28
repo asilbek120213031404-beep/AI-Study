@@ -23,6 +23,19 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
 
   if (!isOpen) return null;
 
+  const resetForm = () => {
+    setEmail('');
+    setPassword('');
+    setFullName('');
+    setTermsAgreed(false);
+    setErrorMessage(null);
+  };
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -54,15 +67,19 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
 
           if (data.user) {
             // 2. Profile table update / upsert into Supabase DB
-            const { data: dbProfile } = await supabase
+            const usernameFromEmail = email.split('@')[0];
+            const { data: dbProfile, error: profileError } = await supabase
               .from('profiles')
               .upsert([
                 {
                   id: data.user.id,
                   full_name: fullName,
+                  email: email,
+                  username: usernameFromEmail,
                   provider: 'email',
                   level: 1,
                   xp: 500,
+                  rank: 5,
                   total_battles: 0,
                   battles_won: 0,
                   battles_lost: 0
@@ -71,20 +88,25 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
               .select()
               .single();
 
+            if (profileError) {
+              console.warn("Profil yaratishda ogohlantirish:", profileError.message);
+            }
+
             const loggedUser: User = {
               id: data.user.id,
-              name: dbProfile?.full_name || fullName || email.split('@')[0],
+              name: dbProfile?.username || dbProfile?.full_name || fullName || usernameFromEmail,
+              username: dbProfile?.username || usernameFromEmail,
               email: email,
               xp: dbProfile?.xp || 500,
               level: dbProfile?.level || 1,
               total_battles: dbProfile?.total_battles || 0,
               battles_won: dbProfile?.battles_won || 0,
               battles_lost: dbProfile?.battles_lost || 0,
-              rank: 5
+              rank: dbProfile?.rank || 5
             };
 
             onLoginSuccess(loggedUser);
-            onClose();
+            handleClose();
           }
         } else {
           // 1. Supabase Sign In Auth
@@ -96,7 +118,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
           if (error) throw error;
 
           if (data?.user) {
-            // .single() o'rniga .maybeSingle() — agar qator topilmasa xato otmaydi, shunchaki null qaytaradi
             const { data: profile, error: profileError } = await supabase
               .from('profiles')
               .select('*')
@@ -107,10 +128,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
               console.error('Profilni yuklashda xatolik:', profileError.message);
             }
 
+            const usernameFromEmail = data.user.email?.split('@')[0] || email.split('@')[0];
             const loggedUser: User = {
               id: data.user.id,
-              name: profile?.full_name || data.user.user_metadata?.full_name || email.split('@')[0],
-              username: fullName,
+              name: profile?.username || profile?.full_name || data.user.user_metadata?.username || data.user.user_metadata?.full_name || usernameFromEmail,
+              username: profile?.username || usernameFromEmail,
               email: data.user.email || email,
               xp: profile?.xp ?? 1250,
               level: profile?.level ?? 5,
@@ -121,24 +143,26 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
             };
 
             onLoginSuccess(loggedUser);
-            onClose();
+            handleClose();
           }
         }
-        const { data, error } = await supabase.auth.getSession();
-
-        console.log("SESSION:", data.session);
-        console.log("ERROR:", error);
       } else {
+        // Demo Mode fallback without Supabase backend
         const username = fullName || (email ? email.split('@')[0] : 'Sardor_Dev');
         const newUser: User = {
-          name: username,
-          email: email,
+          id: `demo-${Date.now()}`,
+          name: isRegisterMode ? (fullName || 'Yangi Foydalanuvchi') : username,
+          username: username,
+          email: email || 'user@example.com',
           xp: isRegisterMode ? 500 : 1250,
           level: isRegisterMode ? 1 : 5,
-          rank: 5
+          rank: isRegisterMode ? 5 : 4,
+          total_battles: 0,
+          battles_won: 0,
+          battles_lost: 0
         };
         onLoginSuccess(newUser);
-        onClose();
+        handleClose();
       }
     } catch (err: any) {
       setErrorMessage(err.message || 'Xatolik yuz berdi. Qaytadan urinib ko\'ring.');
@@ -159,13 +183,19 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
         if (error) throw error;
       } else {
         const newUser: User = {
+          id: `demo-google-${Date.now()}`,
           name: 'Google User',
+          username: 'google_user',
+          email: 'googleuser@example.com',
           xp: 1500,
           level: 6,
-          rank: 3
+          rank: 3,
+          total_battles: 10,
+          battles_won: 7,
+          battles_lost: 3
         };
         onLoginSuccess(newUser);
-        onClose();
+        handleClose();
       }
     } catch (err: any) {
       setErrorMessage(err.message || 'Google orqali kirishda xatolik yuz berdi.');
@@ -180,11 +210,26 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
 
         {/* Close Button */}
         <button
-          onClick={onClose}
+          onClick={handleClose}
           className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-white hover:bg-slate-800/60 rounded-lg transition-colors"
         >
           <X className="w-4 h-4" />
         </button>
+
+        {/* Header Icon & Title */}
+        <div className="text-center space-y-3">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-purple-900/50 to-indigo-900/50 border border-purple-500/30 flex items-center justify-center text-purple-400 shadow-lg shadow-purple-950/50">
+            <GraduationCap className="w-7 h-7 text-purple-400" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-black text-white tracking-tight">
+              AI Study Battle
+            </h2>
+            <p className="text-xs text-slate-400 mt-1 font-medium">
+              {isRegisterMode ? 'Intellektual musobaqa muhitiga xush kelibsiz' : 'Xush kelibsiz'}
+            </p>
+          </div>
+        </div>
 
         {/* Error Banner */}
         {errorMessage && (
@@ -202,31 +247,16 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
         )}
 
         {/* ---------------------------------------------------- */}
-        {/* VIEW 1: REGISTRATION MODE (Screen 2 from Screenshot) */}
+        {/* VIEW 1: REGISTRATION MODE                            */}
         {/* ---------------------------------------------------- */}
         {isRegisterMode ? (
-          <div className="space-y-5 animate-fadeIn">
-            {/* Top Badge Icon */}
-            <div className="text-center space-y-3">
-              <div className="w-14 h-14 mx-auto rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-purple-400 shadow-inner">
-                <GraduationCap className="w-7 h-7 text-purple-400" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-black text-white tracking-tight">
-                  AI Study Battle
-                </h2>
-                <p className="text-xs text-slate-400 mt-1 font-medium">
-                  Intellektual musobaqa muhitiga xush kelibsiz
-                </p>
-              </div>
-            </div>
-
-            <div className="pt-2">
-              <h3 className="text-lg font-bold text-white mb-3">Hisob yaratish</h3>
+          <div className="space-y-4 animate-fadeIn">
+            <div>
+              <h3 className="text-base font-bold text-white mb-2">Hisob yaratish</h3>
             </div>
 
             {/* Registration Form */}
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-3.5">
 
               {/* Full Name */}
               <div className="space-y-1.5">
@@ -234,14 +264,14 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
                   To'liq ismingiz
                 </label>
                 <div className="relative">
-                  <UserIcon className="w-4 h-4 text-slate-700 absolute left-3.5 top-3.5 z-10" />
+                  <UserIcon className="w-4 h-4 text-slate-500 absolute left-3.5 top-3 z-10" />
                   <input
                     type="text"
                     required
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="Ism Familiya"
-                    className="w-full bg-white border border-slate-300 rounded-xl pl-10 pr-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 shadow-sm"
+                    className="w-full bg-[#121626] border border-slate-800 focus:border-purple-500 rounded-xl pl-10 pr-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none transition-colors"
                   />
                 </div>
               </div>
@@ -252,14 +282,14 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
                   Email
                 </label>
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-700 absolute left-3.5 top-3.5 z-10" />
+                  <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-3 z-10" />
                   <input
                     type="email"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="ism@misol.com"
-                    className="w-full bg-white border border-slate-300 rounded-xl pl-10 pr-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 shadow-sm"
+                    className="w-full bg-[#121626] border border-slate-800 focus:border-purple-500 rounded-xl pl-10 pr-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none transition-colors"
                   />
                 </div>
               </div>
@@ -270,19 +300,19 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
                   Parol
                 </label>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-700 absolute left-3.5 top-3.5 z-10" />
+                  <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-3 z-10" />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full bg-white border border-slate-300 rounded-xl pl-10 pr-10 py-2.5 text-xs text-slate-900 placeholder-slate-400 font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 shadow-sm"
+                    className="w-full bg-[#121626] border border-slate-800 focus:border-purple-500 rounded-xl pl-10 pr-10 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none transition-colors"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-3 text-slate-600 hover:text-slate-900 z-10"
+                    className="absolute right-3.5 top-3 text-slate-500 hover:text-slate-300 z-10"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -307,7 +337,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-3.5 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-[0_0_20px_rgba(147,51,234,0.4)] flex items-center justify-center gap-2 transition-all mt-2 disabled:opacity-50"
+                className="w-full py-3 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-[0_0_20px_rgba(147,51,234,0.4)] flex items-center justify-center gap-2 transition-all mt-2 disabled:opacity-50"
               >
                 {isLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin text-white" />
@@ -336,23 +366,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
           </div>
         ) : (
           /* ------------------------------------------------ */
-          /* VIEW 2: LOGIN MODE (Screen 1 from Screenshot)    */
+          /* VIEW 2: LOGIN MODE                               */
           /* ------------------------------------------------ */
-          <div className="space-y-6 animate-fadeIn">
-            {/* Top Circle Logo Badge */}
-            <div className="text-center space-y-3">
-              <div className="w-14 h-14 mx-auto rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-300 font-bold text-sm shadow-inner">
-                bolt
-              </div>
-              <div>
-                <h2 className="text-2xl font-black text-white tracking-tight">
-                  AI Study Battle
-                </h2>
-                <p className="text-xs text-slate-400 mt-1 font-medium">
-                  Xush kelibsiz
-                </p>
-              </div>
-            </div>
+          <div className="space-y-5 animate-fadeIn">
 
             {/* Google Sign In Button */}
             <button
@@ -449,7 +465,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-3.5 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-[0_0_20px_rgba(147,51,234,0.4)] flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                className="w-full py-3 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-[0_0_20px_rgba(147,51,234,0.4)] flex items-center justify-center gap-2 transition-all disabled:opacity-50"
               >
                 {isLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin text-white" />
@@ -482,3 +498,4 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
     </div>
   );
 };
+
