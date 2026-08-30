@@ -20,7 +20,7 @@ interface BattleModalProps {
   selectedSubject?: string;
   user?: User | null;
   roomId?: string | null;
-  onUserUpdate?: () => void;
+  onUserUpdate?: (updatedUser?: User) => void;
 }
 
 const getTableNameBySubject = (subject?: string): string => {
@@ -106,8 +106,8 @@ export const BattleModal: React.FC<BattleModalProps> = ({
   onUserUpdate,
 }) => {
   const [qIdx, setQIdx] = useState(0);
-  const [playerHp, setPlayerHp] = useState(100);
-  const [opponentHp, setOpponentHp] = useState(100);
+  const [playerScore, setPlayerScore] = useState(0);
+  const [opponentScore, setOpponentScore] = useState(0);
   const [selectedOpt, setSelectedOpt] = useState<number | null>(null);
   const [submitted, setSubmitted] = useState(false);
 
@@ -139,7 +139,25 @@ export const BattleModal: React.FC<BattleModalProps> = ({
     if (!isOpen) return;
 
     let isMounted = true;
-    setQuestions(fallbackQuestions);
+
+    // Seeded shuffle helper for exact question alignment between host and guest
+    const seedStr = roomId ? `${roomId}_${selectedSubject}` : `${selectedSubject}_default`;
+    let seedNum = 0;
+    for (let i = 0; i < seedStr.length; i++) {
+      seedNum = ((seedNum << 5) - seedNum) + seedStr.charCodeAt(i);
+      seedNum |= 0;
+    }
+    const pseudoRandom = () => {
+      const x = Math.sin(seedNum++) * 10000;
+      return x - Math.floor(x);
+    };
+
+    const initialShuffled = [...fallbackQuestions];
+    for (let i = initialShuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(pseudoRandom() * (i + 1));
+      [initialShuffled[i], initialShuffled[j]] = [initialShuffled[j], initialShuffled[i]];
+    }
+    setQuestions(initialShuffled.slice(0, 10));
 
     const fetchQuestionsFromSupabase = async () => {
       if (!isSupabaseConfigured()) return;
@@ -169,9 +187,26 @@ export const BattleModal: React.FC<BattleModalProps> = ({
             mapRowToQuestion(q, i, selectedSubject || 'Dasturlash')
           );
 
-          // Pick 10 random questions
-          const shuffled = [...mappedQuestions].sort(() => 0.5 - Math.random()).slice(0, 10);
-          setQuestions(shuffled);
+          // Deterministic shuffle using roomId (or selectedSubject) as seed so both host & guest get exact same 10 questions
+          const seedStr = roomId ? `${roomId}_${selectedSubject}` : `${selectedSubject}_default`;
+          let seedNum = 0;
+          for (let i = 0; i < seedStr.length; i++) {
+            seedNum = ((seedNum << 5) - seedNum) + seedStr.charCodeAt(i);
+            seedNum |= 0;
+          }
+          const pseudoRandom = () => {
+            const x = Math.sin(seedNum++) * 10000;
+            return x - Math.floor(x);
+          };
+
+          const shuffled = [...mappedQuestions];
+          for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(pseudoRandom() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+          }
+          const selectedSet = shuffled.slice(0, 10);
+
+          setQuestions(selectedSet);
 
           // Broadcast 10 selected questions to opponent so both players get exact same set
           if (roomId && isSupabaseConfigured()) {
@@ -179,7 +214,7 @@ export const BattleModal: React.FC<BattleModalProps> = ({
             channel.send({
               type: 'broadcast',
               event: 'questions_loaded',
-              payload: { questions: shuffled },
+              payload: { questions: selectedSet },
             });
           }
         }
@@ -201,8 +236,8 @@ export const BattleModal: React.FC<BattleModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setQIdx(0);
-      setPlayerHp(100);
-      setOpponentHp(100);
+      setPlayerScore(0);
+      setOpponentScore(0);
       setSelectedOpt(null);
       setSubmitted(false);
       setOpponentSubmitted(false);
@@ -214,94 +249,122 @@ export const BattleModal: React.FC<BattleModalProps> = ({
     }
   }, [isOpen, selectedSubject, roomId]);
 
-  // Save battle outcome (battles_won / battles_lost / xp) to Supabase profiles table when battle is over
+  // Save battle outcome (battles_won / battles_lost / xp) to local user state & Supabase profiles table when battle is over
   useEffect(() => {
-    if (!battleOver || !isSupabaseConfigured() || hasSavedResultRef.current) {
+    if (!battleOver || hasSavedResultRef.current) {
       return;
     }
 
-    hasSavedResultRef.current = true;
-    const isWin = opponentHp === 0 || opponentHp < playerHp;
-
     const saveBattleResult = async () => {
-      try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const activeUserId = user?.id || sessionData?.session?.user?.id;
+      hasSavedResultRef.current = true;
 
-        if (!activeUserId) {
-          console.warn('⚠️ User ID topilmadi, Supabase profiles-ga jang natijasi saqlanmadi.');
-          return;
+      const isWin = playerScore > opponentScore;
+      const isTie = playerScore === opponentScore;
+
+      const currentWon = Number(user?.battles_won ?? 0);
+      const currentLost = Number(user?.battles_lost ?? 0);
+      const currentTotal = Number(user?.total_battles ?? (currentWon + currentLost));
+      const currentXp = Number(user?.xp ?? 500);
+
+      const newWon = isWin ? currentWon + 1 : currentWon;
+      const newLost = (!isWin && !isTie) ? currentLost + 1 : currentLost;
+      const newTotal = currentTotal + 1;
+      const newXp = isWin ? currentXp + 200 : currentXp;
+      const newLevel = Math.min(10, Math.floor(newXp / 1000) + 1);
+
+      // Create updated local user object
+      const updatedUser: User = {
+        ...(user || {
+          id: `demo-${Date.now()}`,
+          name: 'O\'yinchi',
+          username: 'player',
+          rank: 4,
+        }),
+        battles_won: newWon,
+        battles_lost: newLost,
+        total_battles: newTotal,
+        xp: newXp,
+        level: newLevel,
+      };
+
+      // Notify parent component immediately so local React state & UI update without delay
+      if (onUserUpdate) {
+        onUserUpdate(updatedUser);
+      }
+
+      // If Supabase is configured, check if activeUserId is a valid UUID before upserting into Supabase DB
+      if (isSupabaseConfigured()) {
+        try {
+          const { data: sessionData } = await supabase.auth.getSession();
+          const activeUserId = user?.id || sessionData?.session?.user?.id;
+
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          if (!activeUserId || !uuidRegex.test(activeUserId)) {
+            console.warn('⚠️ Demo rejim yoki yaroqli UUID topilmadi, Supabase-ga saqlanmadi.');
+            return;
+          }
+
+          console.log(`💾 Jang yakunlandi. Supabase'ga saqlash boshlandi... User: ${activeUserId}, G'alaba: ${isWin}`);
+
+          // Fetch current profile stats
+          const { data: existingProfile, error: fetchError } = await supabase
+            .from('profiles')
+            .select('battles_won, battles_lost, total_battles, xp, level, full_name, username, email')
+            .eq('id', activeUserId)
+            .maybeSingle();
+
+          if (fetchError) {
+            console.error('❌ Supabase profil ma\'lumotlarini olishda xatolik:', fetchError.message);
+          }
+
+          const dbWon = isWin ? Number(existingProfile?.battles_won ?? currentWon) + 1 : Number(existingProfile?.battles_won ?? currentWon);
+          const dbLost = (!isWin && !isTie) ? Number(existingProfile?.battles_lost ?? currentLost) + 1 : Number(existingProfile?.battles_lost ?? currentLost);
+          const dbTotal = Number(existingProfile?.total_battles ?? currentTotal) + 1;
+          const dbXp = isWin ? Number(existingProfile?.xp ?? currentXp) + 200 : Number(existingProfile?.xp ?? currentXp);
+          const dbLevel = Math.min(10, Math.floor(dbXp / 1000) + 1);
+
+          const userName =
+            existingProfile?.full_name ||
+            user?.name ||
+            sessionData?.session?.user?.user_metadata?.full_name ||
+            sessionData?.session?.user?.email?.split('@')[0] ||
+            'O\'yinchi';
+          const userEmail = existingProfile?.email || user?.email || sessionData?.session?.user?.email || '';
+          const userUsername = existingProfile?.username || user?.username || sessionData?.session?.user?.user_metadata?.username;
+
+          const { error: upsertError } = await supabase
+            .from('profiles')
+            .upsert(
+              {
+                id: activeUserId,
+                full_name: userName,
+                username: userUsername || undefined,
+                email: userEmail,
+                battles_won: dbWon,
+                battles_lost: dbLost,
+                total_battles: dbTotal,
+                xp: dbXp,
+                level: dbLevel,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: 'id' }
+            );
+
+          if (upsertError) {
+            console.error('❌ Supabase profiles upsert xatosi:', upsertError.message);
+          } else {
+            console.log(
+              `✅ Supabase profiles muvaffaqiyatli yangilandi: G'alaba=${dbWon}, Mag'lubiyat=${dbLost}, Jami=${dbTotal}, XP=${dbXp}, Level=${dbLevel}`
+            );
+          }
+        } catch (err) {
+          console.error('❌ Jang natijasini saqlashda kutilmagan xatolik:', err);
         }
-
-        console.log(`💾 Jang yakunlandi. Supabase'ga saqlash boshlandi... User: ${activeUserId}, G'alaba: ${isWin}`);
-
-        // Fetch current profile stats
-        const { data: existingProfile, error: fetchError } = await supabase
-          .from('profiles')
-          .select('battles_won, battles_lost, total_battles, xp, level, full_name, username, email')
-          .eq('id', activeUserId)
-          .maybeSingle();
-
-        if (fetchError) {
-          console.error('❌ Supabase profil ma\'lumotlarini olishda xatolik:', fetchError.message);
-        }
-
-        const currentWon = Number(existingProfile?.battles_won ?? user?.battles_won ?? 0);
-        const currentLost = Number(existingProfile?.battles_lost ?? user?.battles_lost ?? 0);
-        const currentTotal = Number(existingProfile?.total_battles ?? user?.total_battles ?? (currentWon + currentLost));
-        const currentXp = Number(existingProfile?.xp ?? user?.xp ?? 500);
-
-        const newWon = isWin ? currentWon + 1 : currentWon;
-        const newLost = isWin ? currentLost : currentLost + 1;
-        const newTotal = currentTotal + 1;
-        const newXp = isWin ? currentXp + 200 : currentXp;
-        const newLevel = Math.min(10, Math.floor(newXp / 1000) + 1);
-
-        const userName =
-          existingProfile?.full_name ||
-          user?.name ||
-          sessionData?.session?.user?.user_metadata?.full_name ||
-          sessionData?.session?.user?.email?.split('@')[0] ||
-          'O\'yinchi';
-        const userEmail = existingProfile?.email || user?.email || sessionData?.session?.user?.email || '';
-        const userUsername = existingProfile?.username || user?.username || sessionData?.session?.user?.user_metadata?.username;
-
-        const { error: upsertError } = await supabase
-          .from('profiles')
-          .upsert(
-            {
-              id: activeUserId,
-              full_name: userName,
-              username: userUsername || undefined,
-              email: userEmail,
-              battles_won: newWon,
-              battles_lost: newLost,
-              total_battles: newTotal,
-              xp: newXp,
-              level: newLevel,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: 'id' }
-          );
-
-        if (upsertError) {
-          console.error('❌ Supabase profiles upsert xatosi:', upsertError.message);
-        } else {
-          console.log(
-            `✅ Supabase profiles muvaffaqiyatli yangilandi: G'alaba=${newWon}, Mag'lubiyat=${newLost}, Jami=${newTotal}, XP=${newXp}, Level=${newLevel}`
-          );
-        }
-
-        if (onUserUpdate) {
-          onUserUpdate();
-        }
-      } catch (err) {
-        console.error('❌ Jang natijasini saqlashda kutilmagan xatolik:', err);
       }
     };
 
     saveBattleResult();
-  }, [battleOver, user, opponentHp, playerHp, onUserUpdate]);
+  }, [battleOver, user, opponentScore, playerScore, onUserUpdate]);
 
   // Supabase Realtime Broadcast Listener
   useEffect(() => {
@@ -315,6 +378,9 @@ export const BattleModal: React.FC<BattleModalProps> = ({
         if (data.playerId !== user?.id && data.qIdx === qIdx) {
           setOpponentSubmitted(true);
           setOpponentOpt(data.selectedOpt);
+          if (data.isCorrect) {
+            setOpponentScore((prev) => prev + 1);
+          }
         }
       })
       .on('broadcast', { event: 'next_question' }, (payload) => {
@@ -351,20 +417,8 @@ export const BattleModal: React.FC<BattleModalProps> = ({
 
     const isCorrect = idx === currentQ.correctAnswerIndex;
     if (isCorrect) {
-      setOpponentHp((prev) => {
-        const next = Math.max(0, prev - 25);
-        if (next === 0) {
-          setBattleOver(true);
-          confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
-        }
-        return next;
-      });
-    } else {
-      setPlayerHp((prev) => {
-        const next = Math.max(0, prev - 25);
-        if (next === 0) setBattleOver(true);
-        return next;
-      });
+      setPlayerScore((prev) => prev + 1);
+      confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
     }
 
     // Broadcast answer to opponent in real-time
@@ -384,8 +438,16 @@ export const BattleModal: React.FC<BattleModalProps> = ({
     } else {
       // Single player / demo fallback: simulate opponent answer
       setTimeout(() => {
+        const oppIsCorrect = Math.random() < 0.7;
+        const oppOpt = oppIsCorrect
+          ? currentQ.correctAnswerIndex
+          : (currentQ.correctAnswerIndex + 1) % currentQ.options.length;
+
         setOpponentSubmitted(true);
-        setOpponentOpt(currentQ.correctAnswerIndex);
+        setOpponentOpt(oppOpt);
+        if (oppIsCorrect) {
+          setOpponentScore((prev) => prev + 1);
+        }
       }, 600);
     }
   };
@@ -394,7 +456,7 @@ export const BattleModal: React.FC<BattleModalProps> = ({
     const nextIdx = qIdx + 1;
     transitionRef.current = false;
 
-    if (nextIdx >= questions.length || playerHp <= 0 || opponentHp <= 0) {
+    if (nextIdx >= questions.length) {
       setBattleOver(true);
     } else {
       setQIdx(nextIdx);
@@ -438,8 +500,8 @@ export const BattleModal: React.FC<BattleModalProps> = ({
 
   const restartBattle = () => {
     setQIdx(0);
-    setPlayerHp(100);
-    setOpponentHp(100);
+    setPlayerScore(0);
+    setOpponentScore(0);
     setSelectedOpt(null);
     setSubmitted(false);
     setOpponentSubmitted(false);
@@ -502,38 +564,38 @@ export const BattleModal: React.FC<BattleModalProps> = ({
           </button>
         </div>
 
-        {/* Health Bars Status Section */}
+        {/* Score Progress Bar Section */}
         <div className="grid grid-cols-2 gap-4 md:gap-8 bg-[#070914] p-4 rounded-2xl border border-slate-800/80 relative z-10">
-          {/* Player HP */}
+          {/* Player Score */}
           <div className="space-y-1.5">
             <div className="flex justify-between items-center text-xs font-bold">
               <span className="text-emerald-400 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#22c55e]" />
                 {user?.name || 'Siz (O\'yinchi 1)'}
               </span>
-              <span className="text-emerald-400 font-mono">{playerHp} HP</span>
+              <span className="text-emerald-400 font-mono text-sm">{playerScore} / {questions.length} ball</span>
             </div>
             <div className="w-full h-3 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
               <div
                 className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-300"
-                style={{ width: `${playerHp}%` }}
+                style={{ width: `${(playerScore / Math.max(1, questions.length)) * 100}%` }}
               />
             </div>
           </div>
 
-          {/* Opponent HP */}
+          {/* Opponent Score */}
           <div className="space-y-1.5">
             <div className="flex justify-between items-center text-xs font-bold">
               <span className="text-purple-400 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-purple-400 shadow-[0_0_8px_#a855f7]" />
                 Raqib (O'yinchi 2)
               </span>
-              <span className="text-purple-400 font-mono">{opponentHp} HP</span>
+              <span className="text-purple-400 font-mono text-sm">{opponentScore} / {questions.length} ball</span>
             </div>
             <div className="w-full h-3 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
               <div
                 className="h-full bg-gradient-to-r from-purple-600 to-indigo-500 rounded-full transition-all duration-300"
-                style={{ width: `${opponentHp}%` }}
+                style={{ width: `${(opponentScore / Math.max(1, questions.length)) * 100}%` }}
               />
             </div>
           </div>
@@ -543,16 +605,22 @@ export const BattleModal: React.FC<BattleModalProps> = ({
         {battleOver ? (
           <div className="text-center py-10 space-y-6 animate-fadeIn relative z-10">
             <div className="w-20 h-20 mx-auto rounded-3xl bg-slate-900 border border-slate-800 flex items-center justify-center text-5xl shadow-2xl">
-              {opponentHp === 0 ? '🏆' : '💀'}
+              {playerScore > opponentScore ? '🏆' : playerScore < opponentScore ? '💀' : '🤝'}
             </div>
             <div className="space-y-2">
               <h4 className="text-3xl font-black text-white tracking-tight">
-                {opponentHp === 0 ? 'G\'ALABA QOZONDINGIZ!' : 'MAG\'LUBIYAT!'}
+                {playerScore > opponentScore
+                  ? 'G\'ALABA QOZONDINGIZ!'
+                  : playerScore < opponentScore
+                  ? 'MAG\'LUBIYAT!'
+                  : 'DURANG!'}
               </h4>
               <p className="text-sm text-slate-400 max-w-md mx-auto">
-                {opponentHp === 0
-                  ? 'Tabriklaymiz! Siz jangda g\'olib bo\'ldingiz va +200 XP to\'pladingiz!'
-                  : 'Raqibingiz bu safar tezroq va aniqroq javob berdi. Qayta sinab ko\'ring.'}
+                {playerScore > opponentScore
+                  ? `Tabriklaymiz! Siz ${questions.length} ta savoldan ${playerScore} tasiga to'g'ri javob berdingiz (raqib: ${opponentScore}) va +200 XP to'pladingiz!`
+                  : playerScore < opponentScore
+                  ? `Raqibingiz ${opponentScore} ta savolga to'g'ri javob berdi, siz esa ${playerScore} ta. Qayta sinab ko'ring.`
+                  : `Ikkala o'yinchi ham ${playerScore} tadan to'g'ri javob berdi! Janggiz durang bilan yakunlandi.`}
               </p>
             </div>
             <div className="flex justify-center gap-4 pt-4">

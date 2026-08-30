@@ -147,11 +147,17 @@ export default function App() {
     setIsDashboardOpen(false);
   };
 
-  const handleRefreshUserProfile = async () => {
+  const handleRefreshUserProfile = async (updatedUser?: User) => {
+    if (updatedUser) {
+      setUser((prev) => (prev ? { ...prev, ...updatedUser } : updatedUser));
+    }
+
     if (!isSupabaseConfigured()) return;
     const { data: { session } } = await supabase.auth.getSession();
-    const targetId = user?.id || session?.user?.id;
-    if (!targetId) return;
+    const targetId = updatedUser?.id || user?.id || session?.user?.id;
+
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!targetId || !uuidRegex.test(targetId)) return;
 
     const { data: profile } = await supabase
       .from('profiles')

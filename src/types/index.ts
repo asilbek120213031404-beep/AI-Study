@@ -43,6 +43,7 @@ export interface GameRoom {
   guest_name: string | null;
   guest_avatar: string | null;
   status: 'waiting' | 'matched' | 'in_progress' | 'completed' | 'cancelled';
+  questions?: Question[];
   created_at?: string;
   updated_at?: string;
 }
