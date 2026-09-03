@@ -20,6 +20,9 @@ export default function App() {
   const [selectedSubject, setSelectedSubject] = useState<string | undefined>();
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
+  const [dashboardInitialTab, setDashboardInitialTab] = useState<
+    'asosiy' | 'yaratish' | 'qoshilish' | 'reyting' | 'sozlamalar' | 'haqida'
+  >('asosiy');
 
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
@@ -127,10 +130,20 @@ export default function App() {
   }, []);
 
   const handleStartBattle = () => {
-    if (!user) {
-      setIsLoginOpen(true);
-    } else {
+    if (user) {
+      setDashboardInitialTab('asosiy');
       setIsDashboardOpen(true);
+    } else {
+      setIsLoginOpen(true);
+    }
+  };
+
+  const handleOpenLeaderboard = () => {
+    if (user) {
+      setDashboardInitialTab('reyting');
+      setIsDashboardOpen(true);
+    } else {
+      setIsLoginOpen(true);
     }
   };
 
@@ -191,6 +204,7 @@ export default function App() {
       <Header
         onOpenLogin={() => {
           if (user) {
+            setDashboardInitialTab('asosiy');
             setIsDashboardOpen(true);
           } else {
             setIsLoginOpen(true);
@@ -205,7 +219,7 @@ export default function App() {
         {/* Hero Section */}
         <HeroSection
           onStartBattle={handleStartBattle}
-          onOpenLeaderboard={() => setIsLeaderboardOpen(true)}
+          onOpenLeaderboard={handleOpenLeaderboard}
         />
 
         {/* Features Section */}
@@ -231,6 +245,7 @@ export default function App() {
       <DashboardModal
         isOpen={isDashboardOpen}
         onClose={() => setIsDashboardOpen(false)}
+        initialTab={dashboardInitialTab}
         onStartBattle={(subject, directBattle, roomId) => {
           setSelectedSubject(subject);
           if (roomId) setCurrentRoomId(roomId);

@@ -13,7 +13,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onStartBattle, onOpenL
       {/* Left Text & CTAs */}
       <div className="lg:col-span-6 space-y-6">
         <h1 className="text-4xl md:text-6xl font-black text-white leading-tight tracking-tight">
-          O'qi. Jang qil. <br />
+          O'qi. Battle-ga kir! <br />
           <span className="text-gradient-purple">G'alaba qozon!</span>
         </h1>
 
@@ -22,13 +22,13 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onStartBattle, onOpenL
         </p>
 
         <div className="grid grid-cols-2 gap-2.5 sm:flex sm:flex-wrap sm:items-center sm:gap-4 pt-2">
-          {/* Jangni boshlash button */}
+          {/* Battle-ni boshlash button */}
           <button
             onClick={onStartBattle}
             className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 py-2.5 sm:px-6 sm:py-3.5 rounded-xl font-bold text-xs sm:text-sm text-white btn-primary-purple transition-all shadow-md"
           >
             <Swords className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-            <span className="truncate">Jangni boshlash</span>
+            <span className="truncate">Battle-ni boshlash</span>
           </button>
 
           {/* Reytingni ko'rish button */}

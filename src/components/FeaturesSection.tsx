@@ -26,12 +26,12 @@ export const FeaturesSection: React.FC = () => {
           </p>
         </div>
 
-        {/* Card 2: Real-vaqtli janglar (Takes 4 columns on medium screens) */}
+        {/* Card 2: Real-vaqtli Battle-lar (Takes 4 columns on medium screens) */}
         <div className="md:col-span-4 bg-dark-card-hover p-8 rounded-2xl space-y-4">
           <div className="w-10 h-10 rounded-xl bg-rose-950/80 border border-rose-800/50 flex items-center justify-center text-rose-400">
             <Zap className="w-5 h-5" />
           </div>
-          <h3 className="text-xl font-bold text-white">Real-vaqtli janglar</h3>
+          <h3 className="text-xl font-bold text-white">Real-vaqtli Battle-lar</h3>
           <p className="text-slate-400 text-sm leading-relaxed">
             Boshqa foydalanuvchilarga qarshi real vaqtda bellashuv.
           </p>

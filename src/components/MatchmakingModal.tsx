@@ -137,7 +137,7 @@ export const MatchmakingModal: React.FC<
 
                 if (updatedRoom.status === 'cancelled') {
                   setOpponentFound(false);
-                  setRoomError('Bu jang bekor qilindi.');
+                  setRoomError('Bu battle bekor qilindi.');
                 }
               }
             )
@@ -350,7 +350,7 @@ export const MatchmakingModal: React.FC<
                 ) : (
                   <Swords className="w-4 h-4" />
                 )}
-                <span>Jangni boshlash</span>
+                <span>Battle-ni boshlash</span>
               </button>
             ) : (
               <button

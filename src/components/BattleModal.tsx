@@ -648,7 +648,7 @@ export const BattleModal: React.FC<BattleModalProps> = ({
                   ? `Tabriklaymiz! Siz ${questions.length} ta savoldan ${playerScore} tasiga to'g'ri javob berdingiz (raqib: ${opponentScore}) va +200 XP to'pladingiz!`
                   : playerScore < opponentScore
                   ? `Raqibingiz ${opponentScore} ta savolga to'g'ri javob berdi, siz esa ${playerScore} ta. Qayta sinab ko'ring.`
-                  : `Ikkala o'yinchi ham ${playerScore} tadan to'g'ri javob berdi! Janggiz durang bilan yakunlandi.`}
+                  : `Ikkala o'yinchi ham ${playerScore} tadan to'g'ri javob berdi! Battle-ingiz durang bilan yakunlandi.`}
               </p>
             </div>
             <div className={clsx('flex', 'justify-center', 'gap-4', 'pt-4')}>
@@ -663,7 +663,7 @@ export const BattleModal: React.FC<BattleModalProps> = ({
                 onClick={onClose}
                 className={clsx('px-7', 'py-3.5', 'rounded-xl', 'text-xs', 'font-bold', 'bg-slate-900', 'border', 'border-slate-800', 'hover:bg-slate-800', 'text-slate-300', 'transition-all')}
               >
-                Jangni yakunlash
+                Battle-ni yakunlash
               </button>
             </div>
           </div>

@@ -99,7 +99,7 @@ export const JoinBattleSection: React.FC<JoinBattleSectionProps> = ({
           } else if (updated.status === 'cancelled') {
             setWaitingForHost(false);
             setJoinedRoom(null);
-            setErrorMessage('Xona egasi jangni bekor qildi.');
+            setErrorMessage('Xona egasi battle-ni bekor qildi.');
           }
         }
       )
@@ -125,12 +125,12 @@ export const JoinBattleSection: React.FC<JoinBattleSectionProps> = ({
     }
 
     if (!targetCode) {
-      setErrorMessage('Jang kodini kiriting.');
+      setErrorMessage('Battle kodini kiriting.');
       return;
     }
 
     if (!/^\d{6}$/.test(targetCode)) {
-      setErrorMessage('Jang kodi 6 xonali bo‘lishi kerak.');
+      setErrorMessage('Battle kodi 6 xonali bo‘lishi kerak.');
       return;
     }
 
@@ -145,14 +145,14 @@ export const JoinBattleSection: React.FC<JoinBattleSectionProps> = ({
         .maybeSingle();
 
       if (findError || !room) {
-        setErrorMessage('Bunday kodli faol jang topilmadi.');
+        setErrorMessage('Bunday kodli faol battle topilmadi.');
         return;
       }
 
       const typedRoom = room as GameRoom;
 
       if (typedRoom.host_id === user.id) {
-        setErrorMessage('Siz o‘zingiz yaratgan jangga qo‘shila olmaysiz.');
+        setErrorMessage('Siz o‘zingiz yaratgan battle-ga qo‘shila olmaysiz.');
         return;
       }
 
@@ -196,10 +196,10 @@ export const JoinBattleSection: React.FC<JoinBattleSectionProps> = ({
       <div className="bg-gradient-to-br from-[#121426] via-[#0E1122] to-[#0A0D1B] border border-slate-800/90 rounded-3xl p-6 md:p-10 shadow-2xl text-center space-y-6">
         <div className="space-y-2 max-w-2xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-black text-white">
-            Jangga Qo'shilish
+            Battle-ga Qo'shilish
           </h2>
           <p className="text-xs md:text-sm text-slate-300">
-            Do'stingiz yuborgan 6 xonali jang kodini kiriting.
+            Do'stingiz yuborgan 6 xonali battle kodini kiriting.
           </p>
         </div>
 
@@ -208,10 +208,10 @@ export const JoinBattleSection: React.FC<JoinBattleSectionProps> = ({
           <div className="bg-[#080B17] border border-purple-500/40 rounded-2xl p-6 max-w-xl mx-auto space-y-4 animate-pulse">
             <div className="flex items-center justify-center gap-3 text-purple-400">
               <Loader2 className="w-6 h-6 animate-spin" />
-              <span className="font-bold text-base">Xona egasi jangni boshlashini kutilmoqda...</span>
+              <span className="font-bold text-base">Xona egasi battle-ni boshlashini kutilmoqda...</span>
             </div>
             <p className="text-xs text-slate-400">
-              Raqibingiz "Jangni boshlash" tugmasini bosishi bilan o'yin avtomatik boshlanadi.
+              Raqibingiz "Battle-ni boshlash" tugmasini bosishi bilan o'yin avtomatik boshlanadi.
             </p>
           </div>
         ) : (
@@ -265,7 +265,7 @@ export const JoinBattleSection: React.FC<JoinBattleSectionProps> = ({
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-2xl font-black text-white">
-              Ommaviy Janglar
+              Ommaviy Battle-lar
             </h3>
             <p className="text-xs text-slate-400">
               Hozirda faol bo'lgan va qatnashchilar kutayotgan xonalar.
@@ -295,7 +295,7 @@ export const JoinBattleSection: React.FC<JoinBattleSectionProps> = ({
                   </div>
 
                   <h4 className="text-lg font-bold text-white">
-                    {room.host_name || 'Xona Egasi'} bilan Jang
+                    {room.host_name || 'Xona Egasi'} bilan Battle
                   </h4>
                   <p className="text-xs text-slate-400 leading-relaxed">
                     Xona kodi: <strong className="text-purple-300 font-mono">{room.room_code}</strong>. Qo'shiling va bilimingizni sinang.

@@ -19,11 +19,34 @@ import {
   Save,
   Key,
   User as UserIcon,
+  Info,
+  Send,
+  Mail,
+  Sparkles,
+  ShieldCheck,
+  GraduationCap,
+  Building2,
 } from 'lucide-react';
 
-import type { User } from '../types';
+import type { User, LeaderboardEntry } from '../types';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { JoinBattleSection } from './JoinBattleSection';
+
+const MOCK_LEADERBOARD: LeaderboardEntry[] = [
+  { rank: 1, name: 'Sardorbek_AI', xp: 18450, winRate: 92, badge: '👑 Grandmaster' },
+  { rank: 2, name: 'Malika_Dev', xp: 14200, winRate: 88, badge: '💎 Master' },
+  { rank: 3, name: 'Javohir_Math', xp: 11900, winRate: 85, badge: '🥇 Diamond' },
+  { rank: 4, name: 'Siz (You)', xp: 1250, winRate: 80, badge: '⚡ Platinum', isUser: true },
+  { rank: 5, name: 'Anvar_Code', xp: 950, winRate: 74, badge: '🥇 Gold' },
+];
+
+const getBadgeByXP = (xp: number, rank: number): string => {
+  if (rank === 1 || xp >= 15000) return '👑 Grandmaster';
+  if (rank === 2 || xp >= 10000) return '💎 Master';
+  if (rank === 3 || xp >= 5000) return '🥇 Diamond';
+  if (xp >= 1000) return '⚡ Platinum';
+  return '🥇 Gold';
+};
 
 interface DashboardModalProps {
   isOpen: boolean;
@@ -32,6 +55,7 @@ interface DashboardModalProps {
   onOpenLeaderboard: () => void;
   user: User | null;
   onUserUpdate?: () => void;
+  initialTab?: 'asosiy' | 'yaratish' | 'qoshilish' | 'reyting' | 'sozlamalar' | 'haqida';
 }
 
 interface DbProfile {
@@ -58,15 +82,24 @@ export const DashboardModal: React.FC<DashboardModalProps> = ({
   onOpenLeaderboard,
   user,
   onUserUpdate,
+  initialTab = 'asosiy',
 }) => {
   const [activeTab, setActiveTab] = useState<
-    'asosiy' | 'yaratish' | 'qoshilish' | 'reyting' | 'sozlamalar'
-  >('asosiy');
+    'asosiy' | 'yaratish' | 'qoshilish' | 'reyting' | 'sozlamalar' | 'haqida'
+  >(initialTab);
+
+  useEffect(() => {
+    if (isOpen && initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
 
   const [selectedCreateSubject, setSelectedCreateSubject] =
     useState<string>('Matematika');
 
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
+  const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>(MOCK_LEADERBOARD);
+  const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
 
   const [dbProfile, setDbProfile] = useState<{
     name: string;
@@ -328,6 +361,59 @@ export const DashboardModal: React.FC<DashboardModalProps> = ({
     };
   }, [isOpen, user?.id]);
 
+  useEffect(() => {
+    if (activeTab !== 'reyting' || !isOpen) return;
+
+    const fetchLeaderboard = async () => {
+      if (!isSupabaseConfigured()) {
+        setLeaderboardData(MOCK_LEADERBOARD);
+        return;
+      }
+
+      setIsLoadingLeaderboard(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const activeUserId = user?.id || session?.user?.id;
+
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, full_name, xp, battles_won, total_battles')
+          .order('xp', { ascending: false })
+          .limit(20);
+
+        if (!error && data && data.length > 0) {
+          const mapped: LeaderboardEntry[] = data.map((item: any, index: number) => {
+            const rank = index + 1;
+            const won = item.battles_won || 0;
+            const total = item.total_battles || 0;
+            const winRate = total > 0 ? Math.round((won / total) * 100) : 0;
+            const isUser = Boolean(activeUserId && item.id === activeUserId);
+
+            return {
+              rank,
+              name: item.full_name || 'O\'yinchi',
+              xp: item.xp || 500,
+              winRate,
+              badge: getBadgeByXP(item.xp || 500, rank),
+              isUser,
+            };
+          });
+
+          setLeaderboardData(mapped);
+        } else {
+          setLeaderboardData(MOCK_LEADERBOARD);
+        }
+      } catch (err) {
+        console.error('Leaderboard fetch xatosi:', err);
+        setLeaderboardData(MOCK_LEADERBOARD);
+      } finally {
+        setIsLoadingLeaderboard(false);
+      }
+    };
+
+    fetchLeaderboard();
+  }, [activeTab, isOpen, user?.id]);
+
   if (!isOpen) {
     return null;
   }
@@ -396,12 +482,12 @@ export const DashboardModal: React.FC<DashboardModalProps> = ({
     },
     {
       id: 'yaratish',
-      label: 'Jang yaratish',
+      label: 'Battle yaratish',
       icon: PlusCircle,
     },
     {
       id: 'qoshilish',
-      label: "Jangga qo'shilish",
+      label: "Battle-ga qo'shilish",
       icon: Gamepad2,
     },
     {
@@ -414,16 +500,17 @@ export const DashboardModal: React.FC<DashboardModalProps> = ({
       label: 'Sozlamalar',
       icon: Settings,
     },
+    {
+      id: 'haqida',
+      label: 'Biz haqimizda',
+      icon: Info,
+    },
   ] as const;
 
   const handleNavClick = (
     id: typeof activeTab
   ) => {
     setActiveTab(id);
-
-    if (id === 'reyting') {
-      onOpenLeaderboard();
-    }
   };
 
   /*
@@ -436,7 +523,7 @@ export const DashboardModal: React.FC<DashboardModalProps> = ({
     {
       name: 'Matematika',
       icon: Calculator,
-      battles: '24 ta faol jang',
+      battles: '24 ta faol battle',
       questions: subjectCounts.math,
       color:
         'text-indigo-400 bg-indigo-500/10 border-indigo-500/20',
@@ -444,7 +531,7 @@ export const DashboardModal: React.FC<DashboardModalProps> = ({
     {
       name: 'Python',
       icon: Code,
-      battles: '42 ta faol jang',
+      battles: '42 ta faol battle',
       questions: subjectCounts.python,
       color:
         'text-sky-400 bg-sky-500/10 border-sky-500/20',
@@ -452,7 +539,7 @@ export const DashboardModal: React.FC<DashboardModalProps> = ({
     {
       name: 'Dasturlash',
       icon: Code,
-      battles: '56 ta faol jang',
+      battles: '56 ta faol battle',
       questions: subjectCounts.it,
       color:
         'text-purple-400 bg-purple-500/10 border-purple-500/20',
@@ -460,7 +547,7 @@ export const DashboardModal: React.FC<DashboardModalProps> = ({
     {
       name: 'Fizika',
       icon: FlaskConical,
-      battles: '12 ta faol jang',
+      battles: '12 ta faol battle',
       questions: subjectCounts.physics,
       color:
         'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
@@ -468,7 +555,7 @@ export const DashboardModal: React.FC<DashboardModalProps> = ({
     {
       name: 'Ingliz tili',
       icon: Globe,
-      battles: '89 ta faol jang',
+      battles: '89 ta faol battle',
       questions: subjectCounts.english,
       color:
         'text-amber-400 bg-amber-500/10 border-amber-500/20',
@@ -476,7 +563,7 @@ export const DashboardModal: React.FC<DashboardModalProps> = ({
     {
       name: 'Tarix',
       icon: BookOpen,
-      battles: '5 ta faol jang',
+      battles: '5 ta faol battle',
       questions: subjectCounts.history,
       color:
         'text-orange-400 bg-orange-500/10 border-orange-500/20',
@@ -624,17 +711,21 @@ export const DashboardModal: React.FC<DashboardModalProps> = ({
           <div>
             <h1 className="text-lg md:text-2xl font-black text-white">
               {activeTab === 'yaratish'
-                ? 'Jang Yaratish'
+                ? 'Battle Yaratish'
                 : activeTab === 'qoshilish'
-                  ? "Jangga Qo'shilish"
+                  ? "Battle-ga Qo'shilish"
                   : activeTab === 'sozlamalar'
                     ? 'Sozlamalar'
-                    : 'Boshqaruv Paneli'}
+                    : activeTab === 'haqida'
+                      ? 'Biz Haqimizda'
+                      : 'Boshqaruv Paneli'}
             </h1>
             <p className="text-[11px] md:text-xs text-slate-400 font-medium">
               {activeTab === 'yaratish'
-                ? "O'z intellektual jang maydoningizni sozlang"
-                : "Statistika va tezkor janglar markazi"}
+                ? "O'z intellektual battle maydoningizni sozlang"
+                : activeTab === 'haqida'
+                  ? "Loyiha muallifi, bog'lanish va platforma ma'lumotlari"
+                  : "Statistika va tezkor battle-lar markazi"}
             </p>
           </div>
 
@@ -659,7 +750,7 @@ export const DashboardModal: React.FC<DashboardModalProps> = ({
                     </span>
                   </h3>
                   <p className="text-slate-300 text-xs md:text-sm">
-                    Yangi jang boshlang yoki mavjud jangga qo'shiling.
+                    Yangi Battle boshlang yoki mavjud Battle-ga qo'shiling.
                   </p>
                 </div>
 
@@ -669,7 +760,7 @@ export const DashboardModal: React.FC<DashboardModalProps> = ({
                     className="btn-primary-purple px-3.5 py-2.5 sm:px-6 sm:py-3 rounded-xl font-bold text-xs sm:text-sm text-white flex items-center justify-center gap-1.5 sm:gap-2"
                   >
                     <Swords className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                    <span>Yangi jang</span>
+                    <span>Yangi Battle</span>
                   </button>
 
                   <button
@@ -746,7 +837,7 @@ export const DashboardModal: React.FC<DashboardModalProps> = ({
               <div className="flex items-center gap-2">
                 <Zap className="w-4 h-4 md:w-5 md:h-5 text-amber-400" />
                 <h4 className="text-base md:text-lg font-extrabold text-white">
-                  Tezkor Janglar
+                  Tezkor Battle-lar
                 </h4>
               </div>
 
@@ -789,7 +880,7 @@ export const DashboardModal: React.FC<DashboardModalProps> = ({
           <div className="space-y-4 md:space-y-8 animate-fadeIn pt-1 md:pt-2 max-w-5xl">
             <div className="space-y-1">
               <h2 className="text-2xl md:text-4xl font-black text-white">
-                Jang yaratish
+                Battle yaratish
               </h2>
               <p className="text-xs md:text-sm text-slate-400">
                 Fanni tanlang va raqibni kuting.
@@ -841,7 +932,7 @@ export const DashboardModal: React.FC<DashboardModalProps> = ({
                 className="w-full sm:w-auto btn-primary-purple px-6 py-3 rounded-xl font-bold text-xs sm:text-sm text-white flex items-center justify-center gap-2"
               >
                 <Swords className="w-4 h-4" />
-                <span>Jangni boshlash</span>
+                <span>Battle-ni boshlash</span>
               </button>
             </div>
           </div>
@@ -850,6 +941,62 @@ export const DashboardModal: React.FC<DashboardModalProps> = ({
         {/* JOIN BATTLE */}
         {activeTab === 'qoshilish' && (
           <JoinBattleSection user={user} onStartBattle={onStartBattle} />
+        )}
+
+        {/* REYTING */}
+        {activeTab === 'reyting' && (
+          <div className="space-y-4 md:space-y-6 animate-fadeIn pt-1 md:pt-2 max-w-4xl">
+            <div className="space-y-1">
+              <h2 className="text-2xl md:text-3xl font-black text-white">
+                Peshqadamlar Reytingi
+              </h2>
+              <p className="text-xs md:text-sm text-slate-400">
+                Platformadagi eng kuchli bilimdonlar ro'yxati va sizning o'rningiz.
+              </p>
+            </div>
+
+            <div className="bg-[#0C0F1E] border border-slate-800/80 p-4 md:p-6 rounded-2xl space-y-3 shadow-lg">
+              {isLoadingLeaderboard ? (
+                <div className="flex flex-col items-center justify-center py-12 text-purple-400 space-y-2">
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                  <span className="text-xs text-slate-400 font-semibold">Reyting yuklanmoqda...</span>
+                </div>
+              ) : (
+                leaderboardData.map((item) => (
+                  <div
+                    key={item.rank}
+                    className={`p-3.5 rounded-xl border flex items-center justify-between text-xs md:text-sm transition-colors ${item.isUser
+                      ? 'bg-purple-950/60 border-purple-500/60 text-white font-bold shadow-md'
+                      : 'bg-[#080A15] border-slate-800/80 text-slate-200 hover:border-slate-700'
+                      }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className={`w-7 h-7 rounded-lg flex items-center justify-center font-extrabold text-xs ${item.rank === 1 ? 'bg-amber-500 text-black' :
+                        item.rank === 2 ? 'bg-slate-300 text-black' :
+                          item.rank === 3 ? 'bg-amber-700 text-white' : 'bg-slate-800 text-slate-400'
+                        }`}>
+                        {item.rank}
+                      </span>
+                      <span className="font-semibold">{item.name}</span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <span className="text-slate-400 hidden sm:inline text-xs">{item.badge}</span>
+                      <span className={`font-bold text-xs px-2.5 py-1 rounded-lg border ${item.winRate >= 80
+                        ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                        : item.winRate >= 50
+                          ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+                          : 'text-rose-400 bg-rose-500/10 border-rose-500/20'
+                        }`}>
+                        {item.winRate}% W
+                      </span>
+                      <span className="font-black text-purple-400">{item.xp} XP</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         )}
 
         {/* SETTINGS */}
@@ -997,6 +1144,196 @@ export const DashboardModal: React.FC<DashboardModalProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        )}
+
+        {/* BIZ HAQIMIZDA */}
+        {activeTab === 'haqida' && (
+          <div className="space-y-6 animate-fadeIn pt-1 md:pt-2 max-w-4xl">
+            {/* HERO BANNER CARD */}
+            <div className="bg-gradient-to-r from-purple-900/40 via-[#0C0F1E] to-indigo-900/40 border border-purple-500/30 p-6 md:p-8 rounded-3xl space-y-4 shadow-xl relative overflow-hidden">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-purple-600/20 border border-purple-500/40 flex items-center justify-center text-purple-400">
+                  <Sparkles className="w-6 h-6" />
+                </div>
+                <div>
+                  <h2 className="text-2xl md:text-3xl font-black text-white">AI Study Battle</h2>
+                  <p className="text-xs md:text-sm text-purple-300 font-medium">
+                    Intellektual va Real-vaqtli Onlayn Musobaqa Platformasi
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-slate-300 text-xs md:text-sm leading-relaxed max-w-2xl">
+                AI Study Battle — o'quvchilar va dasturchilar uchun bilimlarni sinovdan o'tkazish, real vaqt rejimida boshqa foydalanuvchilar bilan bellashish hamda bilim darajasini oshirishga mo'ljallangan zamonaviy ta'lim va musobaqa platformasidir.
+              </p>
+
+              <div className="flex flex-wrap items-center gap-3 pt-2">
+                <span className="bg-purple-500/20 border border-purple-500/40 text-purple-300 text-xs font-mono font-bold px-3 py-1 rounded-full flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
+                  Versiya: v1.2.0
+                </span>
+                <span className="bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-mono font-bold px-3 py-1 rounded-full flex items-center gap-1.5">
+                  Status: Active (Faol)
+                </span>
+              </div>
+            </div>
+
+            {/* AUTHOR, TEACHER, CENTER & CONTACT CARDS */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+              {/* LOYIHA MUALLIFI */}
+              <div className="bg-[#0C0F1E] border border-slate-800/80 p-5 md:p-6 rounded-2xl space-y-3">
+                <div className="flex items-center gap-2.5">
+                  <UserIcon className="w-5 h-5 text-purple-400" />
+                  <h3 className="text-base md:text-lg font-bold text-white">Loyiha Muallifi</h3>
+                </div>
+                <p className="text-slate-300 text-xs md:text-sm leading-relaxed">
+                  Loyiha sun'iy intellekt va ta'lim texnologiyalariga qiziquvchi dasturchilar jamoasi tomonidan ishlab chiqilgan.
+                </p>
+                <a
+                  href="https://t.me/Hasanov_A_2010"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 pt-1 text-xs font-semibold text-purple-300 hover:text-purple-200 transition-colors"
+                >
+                  <span>👨‍💻 Dasturchi: Asilbek (@Hasanov_A_2010)</span>
+                </a>
+              </div>
+
+              {/* USTOZIMIZ */}
+              <div className="bg-[#0C0F1E] border border-slate-800/80 p-5 md:p-6 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <GraduationCap className="w-5 h-5 text-amber-400" />
+                    <h3 className="text-base md:text-lg font-bold text-white">Ustozimiz / Mentor</h3>
+                  </div>
+                  <span className="text-[11px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/20 px-2.5 py-0.5 rounded-full">
+                    Bosh Mentor
+                  </span>
+                </div>
+                <p className="font-bold text-sm text-slate-100">
+                  Hakimov Usmon
+                </p>
+                <p className="text-slate-400 text-xs leading-relaxed">
+                  Loyiha yo'nalishlari va bilim sifatini oshirish bo'yicha maslahatchi va ustoz.
+                </p>
+                <a
+                  href="https://t.me/usmonkul"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 pt-1 text-xs font-bold text-sky-400 hover:text-sky-300 transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                    <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.121l-6.87 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.458c.538-.196 1.006.128.832.941z" />
+                  </svg>
+                  <span>Telegram: @usmonkul</span>
+                </a>
+              </div>
+
+              {/* O'QUV MARKAZ */}
+              <div className="bg-[#0C0F1E] border border-slate-800/80 p-5 md:p-6 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <Building2 className="w-5 h-5 text-emerald-400" />
+                    <h3 className="text-base md:text-lg font-bold text-white">O'quv Markazimiz</h3>
+                  </div>
+                  <span className="text-[11px] font-bold text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 px-2.5 py-0.5 rounded-full">
+                    IT Ta'lim
+                  </span>
+                </div>
+                <p className="font-bold text-sm text-slate-100">
+                  Ilmla IT ta'lim markazi
+                </p>
+                <p className="text-slate-400 text-xs leading-relaxed">
+                  Zamonaviy axborot texnologiyalari va dasturlash yo'nalishida sifatli ta'lim maskani.
+                </p>
+                <a
+                  href="https://t.me/ilmla_uz"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 pt-1 text-xs font-bold text-emerald-400 hover:text-emerald-300 transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                    <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.121l-6.87 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.458c.538-.196 1.006.128.832.941z" />
+                  </svg>
+                  <span>Telegram: t.me/ilmla_uz</span>
+                </a>
+              </div>
+
+              {/* CONTACT & SOCIAL LINKS CARD */}
+              <div className="bg-[#0C0F1E] border border-slate-800/80 p-5 md:p-6 rounded-2xl space-y-4">
+                <div className="flex items-center gap-2.5">
+                  <Send className="w-5 h-5 text-amber-400" />
+                  <h3 className="text-base md:text-lg font-bold text-white">Aloqa va Tarmoqlar</h3>
+                </div>
+
+                <div className="space-y-2 text-xs md:text-sm font-semibold">
+                  <a
+                    href="https://t.me/Hasanov_A_2010"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-[#070914] border border-slate-800 hover:border-purple-500/50 text-slate-200 hover:text-white transition-colors"
+                  >
+                    <span className="flex items-center gap-2">
+                      <svg className="w-4 h-4 text-sky-400 fill-current" viewBox="0 0 24 24">
+                        <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.121l-6.87 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.458c.538-.196 1.006.128.832.941z" />
+                      </svg>
+                      <span>Shaxsiy Telegram Profile</span>
+                    </span>
+                    <span className="text-purple-400 font-mono">@Hasanov_A_2010</span>
+                  </a>
+
+                  <a
+                    href="https://github.com/asilbek120213031404-beep/AI-Study"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-[#070914] border border-slate-800 hover:border-purple-500/50 text-slate-200 hover:text-white transition-colors"
+                  >
+                    <span className="flex items-center gap-2">
+                      <svg className="w-4 h-4 text-slate-300 fill-current" viewBox="0 0 24 24">
+                        <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+                      </svg>
+                      <span>GitHub Kodlar Ombori</span>
+                    </span>
+                    <span className="text-slate-400 font-mono truncate max-w-[120px] sm:max-w-[180px]">AI-Study</span>
+                  </a>
+
+                  <a
+                    href="mailto:mrasilbek3@gmail.com"
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-[#070914] border border-slate-800 hover:border-purple-500/50 text-slate-200 hover:text-white transition-colors"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-rose-400" />
+                      <span>Elektron Pochta</span>
+                    </span>
+                    <span className="text-slate-400 font-mono">mrasilbek3@gmail.com</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            {/* FEATURES GRID */}
+            <div className="bg-[#0C0F1E] border border-slate-800/80 p-5 md:p-6 rounded-2xl space-y-4">
+              <h3 className="text-base md:text-lg font-bold text-white flex items-center gap-2">
+                <Globe className="w-5 h-5 text-indigo-400" />
+                <span>Asosiy Imkoniyatlar</span>
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div className="p-3 rounded-xl bg-[#070914] border border-slate-800/80 space-y-1">
+                  <div className="font-bold text-purple-400">⚡ Real-Vaqtli Battle-lar</div>
+                  <p className="text-slate-400 text-[11px]">Real vaqt rejimida do'stlaringiz va tasodifiy raqiblar bilan bellashing.</p>
+                </div>
+                <div className="p-3 rounded-xl bg-[#070914] border border-slate-800/80 space-y-1">
+                  <div className="font-bold text-amber-400">🏆 XP va Reyting Tizimi</div>
+                  <p className="text-slate-400 text-[11px]">Har bir g'alaba uchun XP to'plang va global darajangizni oshiring.</p>
+                </div>
+                <div className="p-3 rounded-xl bg-[#070914] border border-slate-800/80 space-y-1">
+                  <div className="font-bold text-emerald-400">📚 Turli Fanlar</div>
+                  <p className="text-slate-400 text-[11px]">Matematika, Python, Fizika, Dasturlash va Ingliz tili testlari.</p>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </main>
