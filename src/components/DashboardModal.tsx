@@ -79,7 +79,7 @@ export const DashboardModal: React.FC<DashboardModalProps> = ({
   isOpen,
   onClose,
   onStartBattle,
-  onOpenLeaderboard,
+  // onOpenLeaderboard,
   user,
   onUserUpdate,
   initialTab = 'asosiy',
