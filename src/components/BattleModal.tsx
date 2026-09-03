@@ -306,7 +306,7 @@ export const BattleModal: React.FC<BattleModalProps> = ({
 
           console.log(`💾 Jang yakunlandi. Supabase'ga saqlash boshlandi... User: ${activeUserId}, G'alaba: ${isWin}`);
 
-          // Fetch current profile stats
+          // Fetch current profile stats from DB (source of truth)
           const { data: existingProfile, error: fetchError } = await supabase
             .from('profiles')
             .select('battles_won, battles_lost, total_battles, xp, level, full_name, username, email')
@@ -315,12 +315,20 @@ export const BattleModal: React.FC<BattleModalProps> = ({
 
           if (fetchError) {
             console.error('❌ Supabase profil ma\'lumotlarini olishda xatolik:', fetchError.message);
+            // Fetch xato bo'lsa upsert ham ishlamaydi, shuning uchun to'xtatamiz
+            return;
           }
 
-          const dbWon = isWin ? Number(existingProfile?.battles_won ?? currentWon) + 1 : Number(existingProfile?.battles_won ?? currentWon);
-          const dbLost = (!isWin && !isTie) ? Number(existingProfile?.battles_lost ?? currentLost) + 1 : Number(existingProfile?.battles_lost ?? currentLost);
-          const dbTotal = Number(existingProfile?.total_battles ?? currentTotal) + 1;
-          const dbXp = isWin ? Number(existingProfile?.xp ?? currentXp) + 200 : Number(existingProfile?.xp ?? currentXp);
+          // DB dagi qiymatlardan foydalanish (agar yo'q bo'lsa local state fallback)
+          const baseWon   = Number(existingProfile?.battles_won   ?? currentWon);
+          const baseLost  = Number(existingProfile?.battles_lost  ?? currentLost);
+          const baseTotal = Number(existingProfile?.total_battles ?? currentTotal);
+          const baseXp    = Number(existingProfile?.xp            ?? currentXp);
+
+          const dbWon   = isWin             ? baseWon  + 1 : baseWon;
+          const dbLost  = (!isWin && !isTie)? baseLost + 1 : baseLost;
+          const dbTotal = baseTotal + 1;
+          const dbXp    = isWin ? baseXp + 200 : baseXp;
           const dbLevel = Math.min(10, Math.floor(dbXp / 1000) + 1);
 
           const userName =
@@ -329,16 +337,20 @@ export const BattleModal: React.FC<BattleModalProps> = ({
             sessionData?.session?.user?.user_metadata?.full_name ||
             sessionData?.session?.user?.email?.split('@')[0] ||
             'O\'yinchi';
-          const userEmail = existingProfile?.email || user?.email || sessionData?.session?.user?.email || '';
-          const userUsername = existingProfile?.username || user?.username || sessionData?.session?.user?.user_metadata?.username;
+          const userEmail    = existingProfile?.email    || user?.email    || sessionData?.session?.user?.email || '';
+          const userUsername = existingProfile?.username || user?.username || sessionData?.session?.user?.user_metadata?.username || null;
 
+          console.log(`💾 DB'dan o'qilgan qiymatlar: G'alaba=${baseWon}, Mag'lubiyat=${baseLost}, Jami=${baseTotal}`);
+          console.log(`💾 Yangi qiymatlar: G'alaba=${dbWon}, Mag'lubiyat=${dbLost}, Jami=${dbTotal}, XP=${dbXp}`);
+
+          // undefined o'rniga null ishlatamiz — Supabase undefined ni e'tiborsiz qoldiradi
           const { error: upsertError } = await supabase
             .from('profiles')
             .upsert(
               {
                 id: activeUserId,
                 full_name: userName,
-                username: userUsername || undefined,
+                username: userUsername,   // null bo'lsa Supabase null saqlaydi
                 email: userEmail,
                 battles_won: dbWon,
                 battles_lost: dbLost,
@@ -351,7 +363,7 @@ export const BattleModal: React.FC<BattleModalProps> = ({
             );
 
           if (upsertError) {
-            console.error('❌ Supabase profiles upsert xatosi:', upsertError.message);
+            console.error('❌ Supabase profiles upsert xatosi:', upsertError.message, upsertError);
           } else {
             console.log(
               `✅ Supabase profiles muvaffaqiyatli yangilandi: G'alaba=${dbWon}, Mag'lubiyat=${dbLost}, Jami=${dbTotal}, XP=${dbXp}, Level=${dbLevel}`
