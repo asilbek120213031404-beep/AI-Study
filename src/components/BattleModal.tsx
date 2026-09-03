@@ -109,6 +109,9 @@ export const BattleModal: React.FC<BattleModalProps> = ({
   const [qIdx, setQIdx] = useState(0);
   const [playerScore, setPlayerScore] = useState(0);
   const [opponentScore, setOpponentScore] = useState(0);
+  // Ref — har doim joriy qiymatni saqlaydi (useEffect closure muammosini hal qiladi)
+  const playerScoreRef = useRef(0);
+  const opponentScoreRef = useRef(0);
   const [selectedOpt, setSelectedOpt] = useState<number | null>(null);
   const [submitted, setSubmitted] = useState(false);
 
@@ -239,6 +242,8 @@ export const BattleModal: React.FC<BattleModalProps> = ({
       setQIdx(0);
       setPlayerScore(0);
       setOpponentScore(0);
+      playerScoreRef.current = 0;
+      opponentScoreRef.current = 0;
       setSelectedOpt(null);
       setSubmitted(false);
       setOpponentSubmitted(false);
@@ -429,7 +434,8 @@ export const BattleModal: React.FC<BattleModalProps> = ({
 
     const isCorrect = idx === currentQ.correctAnswerIndex;
     if (isCorrect) {
-      setPlayerScore((prev) => prev + 1);
+      playerScoreRef.current += 1;
+      setPlayerScore(playerScoreRef.current);
       confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
     }
 
@@ -458,7 +464,8 @@ export const BattleModal: React.FC<BattleModalProps> = ({
         setOpponentSubmitted(true);
         setOpponentOpt(oppOpt);
         if (oppIsCorrect) {
-          setOpponentScore((prev) => prev + 1);
+          opponentScoreRef.current += 1;
+          setOpponentScore(opponentScoreRef.current);
         }
       }, 600);
     }
