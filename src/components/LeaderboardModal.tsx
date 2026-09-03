@@ -135,8 +135,17 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({ isOpen, onCl
                   <span className="font-semibold">{item.name}</span>
                 </div>
 
-                <div className="flex items-center gap-4">
-                  <span className="text-slate-400">{item.badge}</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-slate-400 hidden sm:inline">{item.badge}</span>
+                  <span className={`font-bold text-xs px-2 py-0.5 rounded-lg border ${
+                    item.winRate >= 80
+                      ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                      : item.winRate >= 50
+                      ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+                      : 'text-rose-400 bg-rose-500/10 border-rose-500/20'
+                  }`}>
+                    {item.winRate}% W
+                  </span>
                   <span className="font-black text-purple-400">{item.xp} XP</span>
                 </div>
               </div>
