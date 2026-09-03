@@ -264,8 +264,14 @@ export const BattleModal: React.FC<BattleModalProps> = ({
     const saveBattleResult = async () => {
       hasSavedResultRef.current = true;
 
-      const isWin = playerScore > opponentScore;
-      const isTie = playerScore === opponentScore;
+      // Ref qiymatlaridan foydalanamiz — ular har doim joriy va to'g'ri
+      const finalPlayerScore   = playerScoreRef.current;
+      const finalOpponentScore = opponentScoreRef.current;
+
+      const isWin = finalPlayerScore > finalOpponentScore;
+      const isTie = finalPlayerScore === finalOpponentScore;
+
+      console.log(`🎯 Yakuniy natija: Siz=${finalPlayerScore}, Raqib=${finalOpponentScore}, G'alaba=${isWin}, Durang=${isTie}`);
 
       const currentWon = Number(user?.battles_won ?? 0);
       const currentLost = Number(user?.battles_lost ?? 0);
@@ -381,7 +387,7 @@ export const BattleModal: React.FC<BattleModalProps> = ({
     };
 
     saveBattleResult();
-  }, [battleOver, user, opponentScore, playerScore, onUserUpdate]);
+  }, [battleOver, user, onUserUpdate]);
 
   // Supabase Realtime Broadcast Listener
   useEffect(() => {
@@ -396,7 +402,8 @@ export const BattleModal: React.FC<BattleModalProps> = ({
           setOpponentSubmitted(true);
           setOpponentOpt(data.selectedOpt);
           if (data.isCorrect) {
-            setOpponentScore((prev) => prev + 1);
+            opponentScoreRef.current += 1;
+            setOpponentScore(opponentScoreRef.current);
           }
         }
       })
@@ -521,6 +528,8 @@ export const BattleModal: React.FC<BattleModalProps> = ({
     setQIdx(0);
     setPlayerScore(0);
     setOpponentScore(0);
+    playerScoreRef.current = 0;
+    opponentScoreRef.current = 0;
     setSelectedOpt(null);
     setSubmitted(false);
     setOpponentSubmitted(false);
