@@ -338,7 +338,7 @@ export const BattleModal: React.FC<BattleModalProps> = ({
             sessionData?.session?.user?.user_metadata?.full_name ||
             sessionData?.session?.user?.email?.split('@')[0] ||
             'O\'yinchi';
-          const userEmail    = user?.email    || sessionData?.session?.user?.email || '';
+          // const userEmail    = user?.email    || sessionData?.session?.user?.email || '';
           const userUsername = existingProfile?.username || user?.username || sessionData?.session?.user?.user_metadata?.username || null;
 
           console.log(`💾 DB'dan o'qilgan qiymatlar: G'alaba=${baseWon}, Mag'lubiyat=${baseLost}, Jami=${baseTotal}`);
