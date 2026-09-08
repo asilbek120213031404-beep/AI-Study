@@ -226,7 +226,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
           </div>
           <div>
             <h2 className="text-2xl font-black text-white tracking-tight">
-              AI Study Battle
+              Study Battle
             </h2>
             <p className="text-xs text-slate-400 mt-1 font-medium">
               {isRegisterMode ? 'Intellektual musobaqa muhitiga xush kelibsiz' : 'Xush kelibsiz'}

@@ -642,7 +642,7 @@ export const DashboardModal: React.FC<DashboardModalProps> = ({
               </div>
 
               <h2 className="text-base md:text-xl font-black tracking-tight text-white">
-                AI Study Battle
+                Study Battle
               </h2>
             </div>
           </div>
@@ -700,7 +700,7 @@ export const DashboardModal: React.FC<DashboardModalProps> = ({
         </div>
 
         <div className="hidden md:block pt-4 border-t border-slate-800/60 text-[11px] text-slate-500 font-medium text-center">
-          AI Study Battle v1.2
+          Study Battle v1.2
         </div>
       </aside>
 
@@ -1157,7 +1157,7 @@ export const DashboardModal: React.FC<DashboardModalProps> = ({
                   <Sparkles className="w-6 h-6" />
                 </div>
                 <div>
-                  <h2 className="text-2xl md:text-3xl font-black text-white">AI Study Battle</h2>
+                  <h2 className="text-2xl md:text-3xl font-black text-white">Study Battle</h2>
                   <p className="text-xs md:text-sm text-purple-300 font-medium">
                     Intellektual va Real-vaqtli Onlayn Musobaqa Platformasi
                   </p>
@@ -1165,7 +1165,7 @@ export const DashboardModal: React.FC<DashboardModalProps> = ({
               </div>
 
               <p className="text-slate-300 text-xs md:text-sm leading-relaxed max-w-2xl">
-                AI Study Battle — o'quvchilar va dasturchilar uchun bilimlarni sinovdan o'tkazish, real vaqt rejimida boshqa foydalanuvchilar bilan bellashish hamda bilim darajasini oshirishga mo'ljallangan zamonaviy ta'lim va musobaqa platformasidir.
+                Study Battle — o'quvchilar va dasturchilar uchun bilimlarni sinovdan o'tkazish, real vaqt rejimida boshqa foydalanuvchilar bilan bellashish hamda bilim darajasini oshirishga mo'ljallangan zamonaviy ta'lim va musobaqa platformasidir.
               </p>
 
               <div className="flex flex-wrap items-center gap-3 pt-2">

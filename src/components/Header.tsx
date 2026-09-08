@@ -19,7 +19,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenLogin, onLogout, user }) =
         {/* Brand Logo */}
         <div className="flex items-center gap-2 cursor-pointer">
           <h1 className="text-xl md:text-2xl font-black tracking-tight text-white">
-            AI Study Battle
+            Study Battle
           </h1>
         </div>
 

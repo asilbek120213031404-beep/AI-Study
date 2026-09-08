@@ -7,7 +7,7 @@ export const Footer: React.FC = () => {
         
         {/* Brand */}
         <div className="font-extrabold text-base text-white tracking-tight">
-          AI Study Battle
+          Study Battle
         </div>
 
         {/* Links */}
@@ -25,7 +25,7 @@ export const Footer: React.FC = () => {
 
         {/* Copyright */}
         <div>
-          © 2026 AI Study Battle. Barcha huquqlar himoyalangan.
+          © 2026 Study Battle. Barcha huquqlar himoyalangan.
         </div>
 
       </div>
